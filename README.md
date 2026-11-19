@@ -1,5 +1,6 @@
-# AirWise v4 — Urban Air Quality Decision Assistant
+# VayuDesha — Urban Air Quality Decision Assistant
 
+**Repository:** https://github.com/deveshpunjabi/VayuDesha  
 **Tagline:** *Same air. Different lives. Better decisions.*
 
 ---
@@ -8,7 +9,7 @@
 
 **[Challenge 6] Urban Air Quality Assistant** — *Create a GenAI-powered assistant that helps families and communities navigate severe winter smog and urban air pollution. The application should suggest low-emission daily routines, indoor air quality hacks, and sustainable alternatives tailored to their location and lifestyle, while clearly explaining the direct impact of their choices.*
 
-AirWise is designed around five real-world urban personas: **parents/caregivers** (school & outdoor play constraints), **active commuters** (cyclists/walkers balancing low emissions against exertion exposure), **fixed-shift workers** (who cannot shift departure times), **budget-constrained households** (fan-only or zero-budget homes), and **community organizers** (schools, housing societies, and workplaces needing anonymous shareable briefings).
+VayuDesha is designed around five real-world urban personas: **parents/caregivers** (school & outdoor play constraints), **active commuters** (cyclists/walkers balancing low emissions against exertion exposure), **fixed-shift workers** (who cannot shift departure times), **budget-constrained households** (fan-only or zero-budget homes), and **community organizers** (schools, housing societies, and workplaces needing anonymous shareable briefings).
 
 ---
 
@@ -44,7 +45,9 @@ npm run check:size    # ~0.50 MiB source (well under 10 MB limit)
 npm start             # Opens at http://localhost:3000 (dual-stack IPv4 + IPv6)
 ```
 
-> **Optional Live GenAI & Ground Station Mode:** Copy `.env.example` to `.env` (gitignored, never committed), add `GEMINI_API_KEY` (default `gemini-2.5-flash`), `OPENAI_API_KEY` (`gpt-4.1-mini`), and/or `WAQI_API_TOKEN`, then run `npm run start:ai`. Without keys, all features work in full **RULES MODE** with live Open-Meteo data.
+> **Optional Live GenAI & Ground Station Mode:** Copy `.env.example` to `.env` (gitignored, never committed), add `GEMINI_API_KEY` (default `gemini-4-hydrogen` with automatic transient 503 failover to `gemini-2.5-flash`), `OPENAI_API_KEY` (`gpt-4.1-mini`), and/or `WAQI_API_TOKEN`, then run `npm run start:ai`. Without keys, all features work in full **RULES MODE** with live Open-Meteo data.
+>
+> **Vercel Deployment Ready:** Includes `vercel.json` (static `public/` + strict security headers + `/api/*` rewrite) and `api/index.mjs` reusing the zero-dependency `server/index.mjs` HTTP handler.
 
 ### User Flow & Architecture
 

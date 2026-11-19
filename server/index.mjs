@@ -78,7 +78,7 @@ function getTimezone(value) {
   try { new Intl.DateTimeFormat('en', { timeZone: zone }); return zone; }
   catch { return 'UTC'; }
 }
-async function requestHandler(req, res) {
+export async function requestHandler(req, res) {
   securityHeaders(req, res);
   const url = new URL(req.url, 'http://localhost');
   const ip = req.socket.remoteAddress || 'unknown';
@@ -151,6 +151,12 @@ async function requestHandler(req, res) {
             writeChunk(`event: error\ndata: ${JSON.stringify({ error: 'Air-quality update temporarily unavailable.', serverTime: new Date().toISOString() })}\n\n`);
           }
         };
+        if (process.env.VERCEL) {
+          await pushUpdate();
+          cleanup();
+          if (!res.writableEnded) res.end();
+          return;
+        }
         heartbeatTimer = setInterval(() => {
           writeChunk(': heartbeat\n\n');
         }, SSE_HEARTBEAT_MS);
@@ -263,7 +269,7 @@ async function requestHandler(req, res) {
 }
 export function startServer(port = Number(process.env.PORT || 3000)) {
   const server = createServer(requestHandler);
-  server.listen(port, () => console.log(`AirWise available at http://localhost:${server.address().port}`));
+  server.listen(port, () => console.log(`VayuDesha available at http://localhost:${server.address().port}`));
   return server;
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

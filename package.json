@@ -1,9 +1,9 @@
 {
-  "name": "airwise-challenge-6",
-  "version": "4.0.0",
+  "name": "vayudesha-challenge-6",
+  "version": "4.2.0",
   "private": true,
   "type": "module",
-  "description": "AirWise v4: explainable daily air decisions, evidence-locked AI, source-labelled forecasts and community action briefs.",
+  "description": "VayuDesha: Urban Air Quality Assistant for real-time smog intelligence, feasible daily routines, indoor air sizing, and evidence-locked GenAI guidance.",
   "engines": {
     "node": ">=20.10.0"
   },

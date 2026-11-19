@@ -4,19 +4,34 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#FFFFFF">
-  <meta name="description" content="AirWise — Urban Air Quality Assistant for daily smog planning, indoor air sizing, and practical low-emission choices.">
+  <meta name="description" content="VayuDesha — Urban Air Quality Assistant for daily smog planning, indoor air sizing, and practical low-emission choices.">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/styles.css">
   <script src="/app.js" type="module"></script>
-  <title>AirWise — Urban Air Quality Assistant</title>
+  <title>VayuDesha — Urban Air Quality Assistant</title>
 </head>
-<body>
+<body class="is-booting">
+  <div id="app-loader" class="app-loader" role="status" aria-live="polite" aria-label="Loading VayuDesha">
+    <div class="loader-card">
+      <div class="loader-logo" aria-hidden="true">
+        <svg viewBox="0 0 32 32" width="40" height="40" fill="none">
+          <rect width="32" height="32" rx="8" fill="#111827"/>
+          <path d="M7.5 12h11a2.75 2.75 0 1 0-2.4-4.1" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M7.5 17.5h15a2.75 2.75 0 1 1-2.4 4.1" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M7.5 23h7.5" stroke="#9CA3AF" stroke-width="2.2" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <strong class="loader-title">VayuDesha</strong>
+      <p class="loader-subtitle">Preparing live urban air quality data...</p>
+      <div class="loader-track" aria-hidden="true"><span class="loader-fill"></span></div>
+    </div>
+  </div>
   <a class="skip-link" href="#main-content">Skip to main content</a>
 
   <header class="site-header" role="banner">
     <div class="header-inner">
       <div class="header-brand">
-        <a href="#overview" class="brand-link" id="brand-home-link" aria-label="AirWise Home">
+        <a href="#overview" class="brand-link" id="brand-home-link" aria-label="VayuDesha Home">
           <span class="brand-mark" aria-hidden="true">
             <svg viewBox="0 0 32 32" width="30" height="30" fill="none">
               <rect width="32" height="32" rx="8" fill="#111827"/>
@@ -25,7 +40,7 @@
               <path d="M7.5 23h7.5" stroke="#9CA3AF" stroke-width="2.2" stroke-linecap="round"/>
             </svg>
           </span>
-          <span class="brand-name">AirWise</span>
+          <span class="brand-name">VayuDesha</span>
         </a>
 
         <nav class="header-nav" aria-label="Primary view">
@@ -116,24 +131,28 @@
 
           <div id="pulse-grid" class="pulse-grid" aria-live="polite">
             <div class="pulse-card pulse-skeleton" aria-busy="true">
-              <div class="pulse-card-head"><span class="pulse-city">Delhi</span><span class="pill pill-neutral">CAMS MODEL</span></div>
-              <div class="pulse-aqi-row"><span class="pulse-aqi">—</span><span class="pulse-unit">US AQI</span></div>
-              <p class="muted small">Loading live data...</p>
+              <div class="pulse-card-head"><span class="skel skel-title"></span><span class="skel skel-pill"></span></div>
+              <div class="skel skel-num"></div>
+              <div class="skel skel-badge"></div>
+              <div class="pulse-metrics"><div class="skel skel-line"></div><div class="skel skel-line"></div></div>
             </div>
             <div class="pulse-card pulse-skeleton" aria-busy="true">
-              <div class="pulse-card-head"><span class="pulse-city">Mumbai</span><span class="pill pill-neutral">CAMS MODEL</span></div>
-              <div class="pulse-aqi-row"><span class="pulse-aqi">—</span><span class="pulse-unit">US AQI</span></div>
-              <p class="muted small">Loading live data...</p>
+              <div class="pulse-card-head"><span class="skel skel-title"></span><span class="skel skel-pill"></span></div>
+              <div class="skel skel-num"></div>
+              <div class="skel skel-badge"></div>
+              <div class="pulse-metrics"><div class="skel skel-line"></div><div class="skel skel-line"></div></div>
             </div>
             <div class="pulse-card pulse-skeleton" aria-busy="true">
-              <div class="pulse-card-head"><span class="pulse-city">Bengaluru</span><span class="pill pill-neutral">CAMS MODEL</span></div>
-              <div class="pulse-aqi-row"><span class="pulse-aqi">—</span><span class="pulse-unit">US AQI</span></div>
-              <p class="muted small">Loading live data...</p>
+              <div class="pulse-card-head"><span class="skel skel-title"></span><span class="skel skel-pill"></span></div>
+              <div class="skel skel-num"></div>
+              <div class="skel skel-badge"></div>
+              <div class="pulse-metrics"><div class="skel skel-line"></div><div class="skel skel-line"></div></div>
             </div>
             <div class="pulse-card pulse-skeleton" aria-busy="true">
-              <div class="pulse-card-head"><span class="pulse-city">Kolkata</span><span class="pill pill-neutral">CAMS MODEL</span></div>
-              <div class="pulse-aqi-row"><span class="pulse-aqi">—</span><span class="pulse-unit">US AQI</span></div>
-              <p class="muted small">Loading live data...</p>
+              <div class="pulse-card-head"><span class="skel skel-title"></span><span class="skel skel-pill"></span></div>
+              <div class="skel skel-num"></div>
+              <div class="skel skel-badge"></div>
+              <div class="pulse-metrics"><div class="skel skel-line"></div><div class="skel skel-line"></div></div>
             </div>
           </div>
         </section>
@@ -184,7 +203,7 @@
     <!-- =====================================================
          VIEW 2: FOCUSED 4-TAB DASHBOARD
          ===================================================== -->
-    <section id="dashboard-view" class="dashboard-view hidden" aria-label="AirWise Dashboard">
+    <section id="dashboard-view" class="dashboard-view hidden" aria-label="VayuDesha Dashboard">
       <div class="container">
         <!-- SLEEK COMPACT DASHBOARD BAR -->
         <div class="command-bar">
@@ -284,7 +303,7 @@
               <svg class="icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
               </svg>
-              <span>Ask AirWise &amp; Community</span>
+              <span>Ask VayuDesha &amp; Community</span>
             </button>
           </div>
         </div>
@@ -615,7 +634,7 @@
           <section id="assistant" class="panel assistant-section" aria-labelledby="assistant-title">
             <div class="assistant-header">
               <div>
-                <h2 id="assistant-title">Ask AirWise</h2>
+                <h2 id="assistant-title">Ask VayuDesha</h2>
                 <p class="small muted">Ask about school commutes, indoor steps without a purifier, or cycling trade-offs.</p>
               </div>
               <span class="pill pill-accent" id="ai-mode">Checking mode...</span>
@@ -633,7 +652,7 @@
               </div>
 
               <form id="chat-form" class="chat-form">
-                <label class="sr-only" for="chat-input">Ask AirWise</label>
+                <label class="sr-only" for="chat-input">Ask VayuDesha</label>
                 <input id="chat-input" type="text" placeholder="Ask about school, commuting, windows, or fans..." maxlength="550" required>
                 <button type="submit" class="btn btn-primary" id="send-button">
                   <span>Ask</span>
@@ -697,7 +716,7 @@
 
   <footer class="site-footer" role="contentinfo">
     <div class="container footer-inner">
-      <span>AirWise · Urban Air Quality Assistant</span>
+      <span>VayuDesha · Urban Air Quality Assistant</span>
       <span>Data: <a href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer">Open-Meteo</a> &amp; Copernicus CAMS · Geocoding: GeoNames</span>
     </div>
   </footer>

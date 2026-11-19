@@ -66,7 +66,7 @@ export function createCommunityBrief(air, profile={}, timezone='UTC', now=Date.n
   const c=plan.category;
   const community=plan.recommendations.filter(x=>['outdoor','indoor-source','commute'].includes(x.id));
   return {
-    title:'AirWise community air briefing',
+    title:'VayuDesha community air briefing',
     date:localDate(new Date(now).toISOString(),timezone), timezone,
     sourceType:air?.sourceType ?? 'unknown', source:air?.source ?? 'unknown', index:air?.index ?? 'unknown',
     modelTimestamp:air?.current?.time ?? null, value:air?.current?.aqi ?? null,

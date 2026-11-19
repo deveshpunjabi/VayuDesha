@@ -15,15 +15,15 @@ const MINUTE_SHIFT_RE=/\b(?:safest\s+minute|15[- ]minute\s+shift.*(?:safest|best
 const OTHER_DOMAIN_RE=/\b(?:stock market|crypto(?:currency)?|bitcoin|football|cricket scores?|movie tickets|(?:write|tell me) (?:a )?(?:poem|joke|essay)|programming interview|password hack|horoscope|recipes? for dinner)\b/i;
 const SUPPORTED_RE=/\b(?:air|aqi|smog|pollut(?:ion|ants?|ed)|pm2?\.?5|pm10|breath|outdoor|indoor|window|ventilat(?:ion|e)|school|child|kids?|play|exercise|jog|run|cycl(?:e|ing)|walking?|walk|scooter|commut(?:e|ing)|travel|driv(?:e|ing)|car|bus|metro|train|transport|emissions?|filter|purif(?:y|ier|ication)|fan|room|home|cook(?:ing)?|candles?|incense|work(?:er|place)?|shift|move|reschedul(?:e|ing)|smoke|clean(?:er)?|dust|cost|budget|trip|errands?|carbon|weather|grap|cpcb|forecast|lungs?|mask|pollution|medicine|medication|inhaler)\b/i;
 const CLARIFY='Please ask about a specific air-quality decision—such as school play, a commute, an indoor fan, ventilation, or a low-emission option. Include only necessary non-identifying details.';
-const UNSUPPORTED='That question is outside AirWise’s verified air-quality decision guidance. I can help with outdoor activity, school schedules, indoor particle sources, travel trade-offs and the limits of the forecast. I will not invent an unrelated answer.';
+const UNSUPPORTED='That question is outside VayuDesha’s verified air-quality decision guidance. I can help with outdoor activity, school schedules, indoor particle sources, travel trade-offs and the limits of the forecast. I will not invent an unrelated answer.';
 const EMERGENCY='Severe trouble breathing, severe chest pain, or unresponsiveness can be emergencies. Contact local emergency services immediately; do not rely on this app for diagnosis or emergency care.';
 const BOUNDARY_REPLIES={
   medication_boundary:`Do not stop, skip, or change prescribed inhalers or medications based on air-quality forecasts or this app. Follow your clinician's care plan and consult a qualified healthcare professional before changing any treatment.\n\nEvidence: ${evidenceUrl('usAqi')}`,
-  legal_boundary:`AirWise does not infer active GRAP stages or generate government orders from AQI numbers. Check dated official notices directly from the Commission for Air Quality Management (CAQM) or local authorities.\n\nEvidence: ${evidenceUrl('caqm')}`,
-  index_boundary:`India's CPCB National AQI and U.S. AQI are different scales with different category breakpoints and sub-index rules. AirWise displays modelled U.S. AQI from Open-Meteo/Copernicus CAMS—never official Indian CPCB station readings.\n\nEvidence: ${evidenceUrl('usAqi')} · ${evidenceUrl('cpcb')}`,
-  risk_boundary:`AirWise cannot guarantee 100% safe indoor air or calculate personal inhaled dose or disease-risk reduction percentages. Indoor particle levels depend on building leakage, indoor sources, and room-level filtration, which this app does not measure.\n\nEvidence: ${evidenceUrl('cleanerRoom')}`,
-  emissions_boundary:`AirWise cannot calculate precise CO₂ savings without verified vehicle fuel type, efficiency, and replacement-trip data. Use the travel tool to track avoided vehicle-kilometres transparently instead.\n\nEvidence: ${evidenceUrl('transport')}`,
-  privacy_boundary:`Please do not enter your exact home address. AirWise uses regional city-scale modelled forecasts (Open-Meteo/CAMS) and cannot measure street-level or house-level air quality or certify a street-safe route.\n\nEvidence: ${evidenceUrl('camS')}`,
+  legal_boundary:`VayuDesha does not infer active GRAP stages or generate government orders from AQI numbers. Check dated official notices directly from the Commission for Air Quality Management (CAQM) or local authorities.\n\nEvidence: ${evidenceUrl('caqm')}`,
+  index_boundary:`India's CPCB National AQI and U.S. AQI are different scales with different category breakpoints and sub-index rules. VayuDesha displays modelled U.S. AQI from Open-Meteo/Copernicus CAMS—never official Indian CPCB station readings.\n\nEvidence: ${evidenceUrl('usAqi')} · ${evidenceUrl('cpcb')}`,
+  risk_boundary:`VayuDesha cannot guarantee 100% safe indoor air or calculate personal inhaled dose or disease-risk reduction percentages. Indoor particle levels depend on building leakage, indoor sources, and room-level filtration, which this app does not measure.\n\nEvidence: ${evidenceUrl('cleanerRoom')}`,
+  emissions_boundary:`VayuDesha cannot calculate precise CO₂ savings without verified vehicle fuel type, efficiency, and replacement-trip data. Use the travel tool to track avoided vehicle-kilometres transparently instead.\n\nEvidence: ${evidenceUrl('transport')}`,
+  privacy_boundary:`Please do not enter your exact home address. VayuDesha uses regional city-scale modelled forecasts (Open-Meteo/CAMS) and cannot measure street-level or house-level air quality or certify a street-safe route.\n\nEvidence: ${evidenceUrl('camS')}`,
   resolution_boundary:`Hourly regional air-quality forecasts cannot identify a "safest minute" or substantiate a 15-minute departure shift. When schedule flexibility is under an hour, focus on feasible exertion or indoor-source steps rather than micro-timing.\n\nEvidence: ${evidenceUrl('camS')}`
 };
 const dailyAI={day:'',calls:0,inFlight:0};
@@ -161,9 +161,7 @@ async function requestOpenAiSelection(prompt, fetcher) {
   return text;
 }
 
-async function requestGeminiSelection(prompt, fetcher) {
-  const key = String(process.env.GEMINI_API_KEY || '').trim();
-  const model = String(process.env.GEMINI_MODEL || 'gemini-2.5-flash').trim() || 'gemini-2.5-flash';
+async function callGeminiModel(model, key, prompt, fetcher) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
   const response = await fetcher(url, {
     method: 'POST', signal: AbortSignal.timeout(14000),
@@ -187,7 +185,11 @@ async function requestGeminiSelection(prompt, fetcher) {
       }
     })
   });
-  if (!response.ok) throw new Error('AI unavailable');
+  if (!response.ok) {
+    const err = new Error('AI unavailable');
+    err.status = response.status;
+    throw err;
+  }
   const data = await response.json();
   const candidate = Array.isArray(data?.candidates) ? data.candidates[0] : null;
   if (candidate?.finishReason && candidate.finishReason !== 'STOP') throw new Error('Incomplete AI response');
@@ -195,6 +197,20 @@ async function requestGeminiSelection(prompt, fetcher) {
   const text = parts.filter(part => typeof part?.text === 'string').map(part => part.text).join('\n').trim();
   if (!text || text.length > 1000) throw new Error('Unusable AI response');
   return text;
+}
+
+async function requestGeminiSelection(prompt, fetcher) {
+  const key = String(process.env.GEMINI_API_KEY || '').trim();
+  const primary = String(process.env.GEMINI_MODEL || 'gemini-4-hydrogen').trim() || 'gemini-4-hydrogen';
+  const fallback = String(process.env.GEMINI_FALLBACK_MODEL || 'gemini-2.5-flash').trim();
+  try {
+    return await callGeminiModel(primary, key, prompt, fetcher);
+  } catch (error) {
+    if ((error?.status === 503 || error?.status === 429) && fallback && fallback !== primary) {
+      return await callGeminiModel(fallback, key, prompt, fetcher);
+    }
+    throw error;
+  }
 }
 
 export async function getAssistantReply(question,air,profile,timezone='UTC',fetcher=fetch) {

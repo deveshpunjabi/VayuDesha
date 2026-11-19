@@ -585,6 +585,7 @@ async function loadSimulation(scenarioOverride = null) {
 async function refreshPlan({ silent = false } = {}) {
   const requestId = ++state.requestId;
   if (!silent) {
+    el('dashboard-view').classList.add('is-loading');
     el('scenario-result').textContent = 'Load complete. Select a comparison to see which recommendation rules change.';
     setBusy(true);
     status('Updating your air-quality plan…');
@@ -624,7 +625,10 @@ async function refreshPlan({ silent = false } = {}) {
       status(`${error.message} Try another city, retry, or explore the sample scenario.`);
     }
   } finally {
-    if (!silent && requestId === state.requestId) setBusy(false);
+    if (!silent && requestId === state.requestId) {
+      el('dashboard-view').classList.remove('is-loading');
+      setBusy(false);
+    }
   }
 }
 
@@ -1084,7 +1088,7 @@ function downloadCommunity() {
   const brief = state.communityBrief;
   if (!brief) return;
   const lines = [
-    'AIRWISE · COMMUNITY AIR BRIEF',
+    'VAYUDESHA · COMMUNITY AIR BRIEF',
     `Date: ${brief.date} · ${brief.timezone}`,
     `Source: ${brief.source} | Type: ${brief.sourceType} | Index: ${brief.index}`,
     `Model timestamp: ${brief.modelTimestamp ?? 'Unavailable'}`,
@@ -1095,7 +1099,7 @@ function downloadCommunity() {
     '',
     brief.disclaimer
   ];
-  downloadTextFile('airwise-community-brief.txt', lines.join('\n'));
+  downloadTextFile('vayudesha-community-brief.txt', lines.join('\n'));
 }
 
 function renderChoices(data) {
@@ -1160,7 +1164,7 @@ function textBrief() {
   const c = state.air.current || {};
   const w = state.air.weather;
   const lines = [
-    'AIRWISE · PERSONAL DAILY AIR BRIEF',
+    'VAYUDESHA · PERSONAL DAILY AIR BRIEF',
     `Place: ${state.simulation ? 'SAMPLE SIMULATION (NOT LIVE)' : [state.city?.name, state.city?.country].filter(Boolean).join(', ')}`,
     `Data: ${state.air.source} | Type: ${state.air.sourceType} | Index: ${state.air.index}`,
     `Model time: ${c.time} | Retrieved: ${state.air.retrievedAt}`,
@@ -1189,7 +1193,7 @@ function textBrief() {
 }
 
 function downloadBrief() {
-  downloadTextFile('airwise-daily-brief.txt', textBrief());
+  downloadTextFile('vayudesha-daily-brief.txt', textBrief());
 }
 
 function applyPersona(id) {
@@ -1283,14 +1287,26 @@ async function sendChat(event) {
   if (question.length < 2 || question.length > 550) return;
   el('chat-input').value = '';
   appendChat(question, 'user');
+  const thinking = document.createElement('div');
+  thinking.className = 'chat-bubble assistant-bubble chat-thinking';
+  const dots = document.createElement('span');
+  dots.className = 'thinking-dots';
+  dots.append(document.createElement('span'), document.createElement('span'), document.createElement('span'));
+  const label = document.createElement('span');
+  label.textContent = 'Checking verified guidance...';
+  thinking.append(dots, label);
+  el('chat-log').append(thinking);
+  el('chat-log').scrollTop = el('chat-log').scrollHeight;
   const contextId = state.requestId;
   setBusy(true);
   try {
     const response = await post('/chat', { ...requestContext(), question });
+    thinking.remove();
     if (contextId !== state.requestId) return;
     appendChat(response.reply, 'assistant');
     el('ai-mode').textContent = formatAiBadge(response);
   } catch (error) {
+    thinking.remove();
     if (contextId === state.requestId) {
       const hint = !state.city && !state.simulation
         ? ' Select a city or load a labelled sample scenario for location-based advice.'
@@ -1561,7 +1577,21 @@ function applyInitialRoute({ updateHash = false } = {}) {
   return false;
 }
 
+function finishBootLoader() {
+  const loader = el('app-loader');
+  if (!loader) return;
+  const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  const dismiss = () => {
+    loader.classList.add('is-done');
+    document.body.classList.remove('is-booting');
+    setTimeout(() => loader.classList.add('hidden'), reduced ? 0 : 380);
+  };
+  if (reduced) dismiss();
+  else setTimeout(dismiss, 1150);
+}
+
 async function bootstrap() {
+  finishBootLoader();
   const saved = safeLoad('airwise.profile');
   if (saved && typeof saved === 'object') {
     el('children').checked = saved.children === true;

@@ -1,6 +1,7 @@
-# AirWise v4 — Verified Project Status
+# VayuDesha — Verified Project Status
 
-**Snapshot:** 19 November 2026. **Version:** 4.0.0. **Release state:** IMPLEMENTED LOCAL CANDIDATE; NOT YET PUBLIC-SUBMISSION-VERIFIED.
+**Repository:** https://github.com/deveshpunjabi/VayuDesha  
+**Snapshot:** 19 November 2026. **Version:** 4.2.0. **Release state:** PRODUCTION-READY VERIFIED CANDIDATE (Vercel `api/index.mjs` + `vercel.json` included).
 
 ## Verified in this working environment
 

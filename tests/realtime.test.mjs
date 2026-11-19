@@ -268,7 +268,7 @@ test('Google Gemini structured-JSON provider selects approved actions, composes 
     };
 
     const res = await getAssistantReply('Should my child play outside today?', getSimulatedAir(), { children: true }, 'Asia/Kolkata', okFetcher);
-    assert.match(calledUrl, /generativelanguage\.googleapis\.com\/v1beta\/models\/gemini-2\.5-flash:generateContent$/);
+    assert.match(calledUrl, /generativelanguage\.googleapis\.com\/v1beta\/models\/gemini-4-hydrogen:generateContent$/);
     assert.doesNotMatch(calledUrl, /key=/);
     assert.equal(sentHeaders['x-goog-api-key'], 'mock-gemini-key');
     assert.equal(sentPayload.generationConfig.responseMimeType, 'application/json');
@@ -281,6 +281,24 @@ test('Google Gemini structured-JSON provider selects approved actions, composes 
     assert.match(res.reply, /DEMO ONLY/);
     assert.match(res.reply, /Evidence:/);
     assert.deepEqual(res.evidence.map(e => e.id), ['children', 'outdoor']);
+
+    // Transient 503 on primary Gemini model automatically fails over to fallback model
+    const calledModels = [];
+    const failoverRes = await getAssistantReply('Should my child play outside today?', getSimulatedAir(), { children: true }, 'Asia/Kolkata', async url => {
+      calledModels.push(url);
+      if (url.includes('gemini-4-hydrogen')) return { ok: false, status: 503, json: async () => ({ error: { code: 503 } }) };
+      return {
+        ok: true,
+        json: async () => ({
+          candidates: [{ finishReason: 'STOP', content: { parts: [{ text: JSON.stringify({ status: 'supported', actionIds: ['outdoor'] }) }] } }]
+        })
+      };
+    });
+    assert.equal(calledModels.length, 2);
+    assert.match(calledModels[0], /gemini-4-hydrogen:generateContent$/);
+    assert.match(calledModels[1], /gemini-2\.5-flash:generateContent$/);
+    assert.equal(failoverRes.mode, 'genai');
+    assert.equal(failoverRes.provider, 'gemini');
 
     // Invalid JSON falls back safely to verified rules
     const badJson = await getAssistantReply('How should I commute today?', getSimulatedAir(), {}, 'UTC', async () => ({
