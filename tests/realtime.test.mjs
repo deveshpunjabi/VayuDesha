@@ -347,7 +347,7 @@ test('HTTP /api/health reports aiProvider and waqiEnabled without leaking secret
     const res = await fetch(`${base}/api/health`);
     assert.equal(res.status, 200);
     const body = await res.json();
-    assert.deepEqual(body, { ok: true, aiEnabled: false, aiProvider: null, openaqEnabled: false, waqiEnabled: false });
+    assert.deepEqual(body, { ok: true, aiEnabled: false, aiProvider: null, aiModel: null, openaqEnabled: false, waqiEnabled: false });
   });
 
   // /api/health with mocked keys must NEVER leak raw secrets
@@ -359,7 +359,7 @@ test('HTTP /api/health reports aiProvider and waqiEnabled without leaking secret
     assert.doesNotMatch(text, /super-secret-openaq-xyz/);
     assert.doesNotMatch(text, /super-secret-waqi-xyz/);
     const body = JSON.parse(text);
-    assert.deepEqual(body, { ok: true, aiEnabled: true, aiProvider: 'gemini', openaqEnabled: true, waqiEnabled: true });
+    assert.deepEqual(body, { ok: true, aiEnabled: true, aiProvider: 'gemini', aiModel: 'gemini-4-hydrogen', openaqEnabled: true, waqiEnabled: true });
   });
 
   // /api/stream rejects invalid coordinates with 400

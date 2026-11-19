@@ -124,6 +124,13 @@ export function activeAiProvider() {
   return null;
 }
 
+export function activeAiModel() {
+  const provider = activeAiProvider();
+  if (provider === 'gemini') return String(process.env.GEMINI_MODEL || 'gemini-4-hydrogen').trim() || 'gemini-4-hydrogen';
+  if (provider === 'openai') return String(process.env.OPENAI_MODEL || 'gpt-4.1-mini').trim() || 'gpt-4.1-mini';
+  return null;
+}
+
 async function requestOpenAiSelection(prompt, fetcher) {
   const response = await fetcher('https://api.openai.com/v1/responses', {
     method: 'POST', signal: AbortSignal.timeout(14000),
@@ -204,10 +211,10 @@ async function requestGeminiSelection(prompt, fetcher) {
   const primary = String(process.env.GEMINI_MODEL || 'gemini-4-hydrogen').trim() || 'gemini-4-hydrogen';
   const fallback = String(process.env.GEMINI_FALLBACK_MODEL || 'gemini-2.5-flash').trim();
   try {
-    return await callGeminiModel(primary, key, prompt, fetcher);
+    return { text: await callGeminiModel(primary, key, prompt, fetcher), modelUsed: primary };
   } catch (error) {
     if ((error?.status === 503 || error?.status === 429) && fallback && fallback !== primary) {
-      return await callGeminiModel(fallback, key, prompt, fetcher);
+      return { text: await callGeminiModel(fallback, key, prompt, fetcher), modelUsed: fallback };
     }
     throw error;
   }
@@ -217,25 +224,25 @@ export async function getAssistantReply(question,air,profile,timezone='UTC',fetc
   const clean=String(question??'').trim();
   if(clean.length<2||clean.length>550) throw new Error('Ask a question between 2 and 550 characters.');
   const scope=questionScope(clean);
-  if(scope!=='supported') return {mode:'rules',provider:'rules',status:scope,reply:ruleBasedReply(clean,air,profile,timezone),evidence:[]};
+  if(scope!=='supported') return {mode:'rules',provider:'rules',modelUsed:'rules',status:scope,reply:ruleBasedReply(clean,air,profile,timezone),evidence:[]};
   const plan=buildPlan(air,profile,timezone);
   const provider=activeAiProvider();
-  if(!provider) return {mode:'rules',provider:'rules',status:'supported',...composeApproved(air,plan,chooseRules(clean,plan))};
+  if(!provider) return {mode:'rules',provider:'rules',modelUsed:'rules',status:'supported',...composeApproved(air,plan,chooseRules(clean,plan))};
   const day=new Date().toISOString().slice(0,10);
   if(dailyAI.day!==day){dailyAI.day=day;dailyAI.calls=0;}
   const quota=Number(process.env.AI_DAILY_REQUEST_CAP??80);
   const capped=Number.isInteger(quota)&&quota>0?Math.min(quota,500):80;
-  if(dailyAI.calls>=capped||dailyAI.inFlight>=3) return {mode:'fallback',provider:'rules',status:'provider_unavailable',reply:ruleBasedReply(clean,air,profile,timezone),evidence:[],note:'AI capacity limit reached. Verified local rules were used.'};
+  if(dailyAI.calls>=capped||dailyAI.inFlight>=3) return {mode:'fallback',provider:'rules',modelUsed:'rules',status:'provider_unavailable',reply:ruleBasedReply(clean,air,profile,timezone),evidence:[],note:'AI capacity limit reached. Verified local rules were used.'};
   dailyAI.calls++;dailyAI.inFlight++;
   const prompt=makeGroundedPrompt(clean,air,profile,timezone);
   try {
-    const text = provider === 'gemini'
+    const selected = provider === 'gemini'
       ? await requestGeminiSelection(prompt, fetcher)
-      : await requestOpenAiSelection(prompt, fetcher);
-    const decision=parseSelectedActions(text,plan);
-    if(decision.status!=='supported') return {mode:'genai',provider,status:decision.status,reply:decision.status==='unsupported'?UNSUPPORTED:CLARIFY,evidence:[]};
-    return {mode:'genai',provider,status:'supported',...composeApproved(air,plan,decision.actionIds)};
+      : { text: await requestOpenAiSelection(prompt, fetcher), modelUsed: process.env.OPENAI_MODEL || 'gpt-4.1-mini' };
+    const decision=parseSelectedActions(selected.text,plan);
+    if(decision.status!=='supported') return {mode:'genai',provider,modelUsed:selected.modelUsed,status:decision.status,reply:decision.status==='unsupported'?UNSUPPORTED:CLARIFY,evidence:[]};
+    return {mode:'genai',provider,modelUsed:selected.modelUsed,status:'supported',...composeApproved(air,plan,decision.actionIds)};
   } catch {
-    return {mode:'fallback',provider:'rules',status:'provider_unavailable',reply:ruleBasedReply(clean,air,profile,timezone),evidence:[],note:'AI provider output was unavailable or invalid. Checked rules were used.'};
+    return {mode:'fallback',provider:'rules',modelUsed:'rules',status:'provider_unavailable',reply:ruleBasedReply(clean,air,profile,timezone),evidence:[],note:'AI provider output was unavailable or invalid. Checked rules were used.'};
   } finally {dailyAI.inFlight--;}
 }

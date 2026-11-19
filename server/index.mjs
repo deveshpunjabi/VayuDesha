@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { getAir, getSimulatedAir, getLiveCityPulse, searchCities, validateCoordinates, DEMO_SCENARIOS } from './air.mjs';
 import { buildPlan, normalizeProfile, minimumSmokeCadr, avoidedMotorizedDistance } from './decisions.mjs';
-import { getAssistantReply, questionScope, activeAiProvider } from './ai.mjs';
+import { getAssistantReply, questionScope, activeAiProvider, activeAiModel } from './ai.mjs';
 import { buildChoices, buildCommunityActions } from './choices.mjs';
 import { compareHouseholds, ALTERNATIVE_OPTIONS } from './compare.mjs';
 import { buildDailyRoutine, createCommunityBrief } from './routine.mjs';
@@ -92,6 +92,7 @@ export async function requestHandler(req, res) {
           ok: true,
           aiEnabled: Boolean(aiProvider),
           aiProvider,
+          aiModel: activeAiModel(),
           openaqEnabled: Boolean(String(process.env.OPENAQ_API_KEY || '').trim()),
           waqiEnabled: Boolean(String(process.env.WAQI_API_TOKEN || '').trim())
         });

@@ -51,6 +51,7 @@ const state = {
   completed: new Set(),
   aiConfigured: false,
   aiProvider: null,
+  aiModel: null,
   eventSource: null,
   streamMode: 'idle',
   lastUpdatedAt: null,
@@ -195,16 +196,20 @@ function updateProfileSummary() {
   el('profile-summary-pill').textContent = parts.join(' · ');
 }
 
+let drawerCloseTimer = null;
 function openProfileDrawer() {
   const drawer = el('profile');
   const backdrop = el('profile-backdrop');
   const trigger = el('open-profile-btn');
+  if (drawerCloseTimer) { clearTimeout(drawerCloseTimer); drawerCloseTimer = null; }
   drawer.classList.remove('hidden');
-  drawer.classList.add('is-open');
-  drawer.setAttribute('aria-hidden', 'false');
   backdrop.classList.remove('hidden');
-  backdrop.classList.add('is-open');
+  drawer.setAttribute('aria-hidden', 'false');
   trigger.setAttribute('aria-expanded', 'true');
+  requestAnimationFrame(() => {
+    drawer.classList.add('is-open');
+    backdrop.classList.add('is-open');
+  });
   el('close-profile-btn').focus();
 }
 
@@ -212,13 +217,18 @@ function closeProfileDrawer({ restoreFocus = true } = {}) {
   const drawer = el('profile');
   const backdrop = el('profile-backdrop');
   const trigger = el('open-profile-btn');
-  const wasOpen = drawer.classList.contains('is-open');
-  drawer.classList.add('hidden');
+  const wasOpen = drawer.classList.contains('is-open') || !drawer.classList.contains('hidden');
   drawer.classList.remove('is-open');
-  drawer.setAttribute('aria-hidden', 'true');
-  backdrop.classList.add('hidden');
   backdrop.classList.remove('is-open');
+  drawer.setAttribute('aria-hidden', 'true');
   trigger.setAttribute('aria-expanded', 'false');
+  const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  const finalize = () => {
+    drawer.classList.add('hidden');
+    backdrop.classList.add('hidden');
+  };
+  if (reduced) finalize();
+  else drawerCloseTimer = setTimeout(finalize, 280);
   if (wasOpen && restoreFocus) trigger.focus();
 }
 
@@ -302,7 +312,7 @@ function formatRelativeAge(timestampMs) {
 }
 
 function updateSyncStatus() {
-  const dot = document.querySelector('.command-toolbar .live-dot');
+  const dot = document.querySelector('.status-strip .live-dot');
   const label = el('live-sync-status');
   if (state.simulation && state.air) {
     if (dot) { dot.className = 'live-dot is-sim'; }
@@ -877,6 +887,7 @@ function renderChart(forecast) {
   }));
   chart.append(makeSvg('path', {
     d: line,
+    class: 'chart-line-animated',
     fill: 'none',
     stroke: '#111827',
     'stroke-width': 2.5,
@@ -1283,6 +1294,99 @@ function formatAiBadge(response) {
     : 'RULE-BASED ASSISTANT · AI NOT CONFIGURED';
 }
 
+function createThinkingBubble() {
+  const card = document.createElement('div');
+  card.className = 'chat-thinking-card';
+  const head = document.createElement('div');
+  head.className = 'thinking-head';
+  const orb = document.createElement('span');
+  orb.className = 'thinking-orb';
+  orb.setAttribute('aria-hidden', 'true');
+  const title = document.createElement('span');
+  title.textContent = state.aiConfigured ? 'Thinking' : 'Evaluating rules';
+  head.append(orb, title);
+  if (state.aiModel) {
+    const tag = document.createElement('span');
+    tag.className = 'thinking-model-tag';
+    tag.textContent = state.aiModel;
+    head.append(tag);
+  }
+  const phase = document.createElement('div');
+  phase.className = 'thinking-phase';
+  const steps = state.aiConfigured
+    ? [
+        'Reading live regional air & household profile...',
+        `Routing with ${state.aiModel || 'Gemini'}...`,
+        'Validating server-approved actions & citations...'
+      ]
+    : ['Checking live regional air & household constraints...', 'Selecting verified action guidance...'];
+  let idx = 0;
+  phase.textContent = steps[0];
+  const timer = setInterval(() => {
+    idx = (idx + 1) % steps.length;
+    phase.textContent = steps[idx];
+  }, 900);
+  card.append(head, phase);
+  el('chat-log').append(card);
+  el('chat-log').scrollTop = el('chat-log').scrollHeight;
+  return {
+    remove() {
+      clearInterval(timer);
+      card.remove();
+    }
+  };
+}
+
+function typeChatReply(message, metaLabel = '') {
+  const node = document.createElement('div');
+  node.className = 'chat-bubble assistant-bubble';
+  const textSpan = document.createElement('span');
+  node.append(textSpan);
+  const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  const finish = () => {
+    textSpan.textContent = message;
+    if (metaLabel) {
+      const br = document.createElement('br');
+      const tag = document.createElement('span');
+      tag.className = 'chat-meta-tag';
+      tag.textContent = metaLabel;
+      node.append(br, tag);
+    }
+    el('chat-log').scrollTop = el('chat-log').scrollHeight;
+  };
+  el('chat-log').append(node);
+  if (reduced || message.length < 24) {
+    finish();
+    return;
+  }
+  const cursor = document.createElement('span');
+  cursor.className = 'typing-cursor';
+  cursor.setAttribute('aria-hidden', 'true');
+  node.append(cursor);
+  const tokens = message.match(/\S+\s*/g) || [message];
+  let i = 0;
+  const stepSize = tokens.length > 90 ? 4 : tokens.length > 45 ? 3 : 2;
+  const tick = () => {
+    if (!node.isConnected) return;
+    i = Math.min(tokens.length, i + stepSize);
+    textSpan.textContent = tokens.slice(0, i).join('');
+    el('chat-log').scrollTop = el('chat-log').scrollHeight;
+    if (i < tokens.length) setTimeout(tick, 18);
+    else {
+      cursor.remove();
+      if (metaLabel) {
+        const br = document.createElement('br');
+        const tag = document.createElement('span');
+        tag.className = 'chat-meta-tag';
+        tag.textContent = metaLabel;
+        node.append(br, tag);
+      }
+      el('chat-log').scrollTop = el('chat-log').scrollHeight;
+    }
+  };
+  tick();
+}
+
 async function sendChat(event) {
   event.preventDefault();
   if (state.busy) return;
@@ -1290,23 +1394,19 @@ async function sendChat(event) {
   if (question.length < 2 || question.length > 550) return;
   el('chat-input').value = '';
   appendChat(question, 'user');
-  const thinking = document.createElement('div');
-  thinking.className = 'chat-bubble assistant-bubble chat-thinking';
-  const dots = document.createElement('span');
-  dots.className = 'thinking-dots';
-  dots.append(document.createElement('span'), document.createElement('span'), document.createElement('span'));
-  const label = document.createElement('span');
-  label.textContent = 'Checking verified guidance...';
-  thinking.append(dots, label);
-  el('chat-log').append(thinking);
-  el('chat-log').scrollTop = el('chat-log').scrollHeight;
+  const thinking = createThinkingBubble();
   const contextId = state.requestId;
   setBusy(true);
   try {
     const response = await post('/chat', { ...requestContext(), question });
     thinking.remove();
     if (contextId !== state.requestId) return;
-    appendChat(response.reply, 'assistant');
+    const metaLabel = response.mode === 'genai'
+      ? `${response.provider === 'gemini' ? 'Gemini' : 'OpenAI'} · ${response.modelUsed || state.aiModel || 'structured'}`
+      : response.mode === 'fallback'
+        ? 'Verified rules fallback'
+        : 'Verified rules engine';
+    typeChatReply(response.reply, metaLabel);
     el('ai-mode').textContent = formatAiBadge(response);
   } catch (error) {
     thinking.remove();
@@ -1625,15 +1725,16 @@ async function bootstrap() {
     const info = await api('/health');
     state.aiConfigured = Boolean(info.aiEnabled);
     state.aiProvider = info.aiProvider || null;
+    state.aiModel = info.aiModel || null;
     if (info.aiEnabled) {
       const providerLabel = info.aiProvider === 'gemini'
-        ? 'GEMINI'
+        ? `GEMINI · ${info.aiModel || 'gemini-4-hydrogen'}`
         : info.aiProvider === 'openai'
-          ? 'OPENAI'
+          ? `OPENAI · ${info.aiModel || 'gpt-4.1-mini'}`
           : 'GENAI';
-      el('ai-mode').textContent = `${providerLabel} CONFIGURED · NOT INDEPENDENTLY VERIFIED`;
+      el('ai-mode').textContent = `${providerLabel} · READY`;
     } else {
-      el('ai-mode').textContent = 'RULES MODE · ADD AN API KEY FOR GENAI';
+      el('ai-mode').textContent = 'RULES MODE · NO API KEY';
     }
   } catch {
     el('ai-mode').textContent = 'ASSISTANT · SERVER CONNECTION REQUIRED';
