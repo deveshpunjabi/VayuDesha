@@ -1,0 +1,77 @@
+/** Human-auditable scenario comparisons. These are qualitative, not measured personal exposure. */
+import { categoryForUsAqi, normalizeProfile, SOURCES } from './decisions.mjs';
+
+const levels = ['Lower outdoor exertion', 'Depends on conditions', 'More outdoor exertion'];
+export function buildChoices(air, inputProfile = {}) {
+  const p = normalizeProfile(inputProfile);
+  const category = categoryForUsAqi(air?.current?.aqi);
+  const unknown = category.level < 0;
+  const polluted = category.level >= 2 || unknown;
+  const veryPolluted = category.level >= 3;
+  const canShift = p.maxShiftMinutes >= 60;
+  const choices = [
+    {
+      id: 'remote', title: 'Avoid an optional trip', tag: 'Consider first',
+      exposure: 'Avoids that outdoor trip', emissions: 'Avoids associated personal motorized trip only when one is displaced', cost: 'Usually no travel fare',
+      fit: veryPolluted ? 'strong' : 'possible',
+      reasoning: 'Works only if the trip is optional or remote participation is genuinely available.',
+      limitation: 'Indoor air may still be polluted; a necessary trip cannot always be skipped.',
+      source: SOURCES.transport
+    },
+    {
+      id: 'transit', title: 'Choose shared transport', tag: 'Practical alternative',
+      exposure: 'Varies by station, waiting time and ventilation', emissions: 'Potentially lower per-person transport emissions than a solo vehicle', cost: 'Fare and transfers vary',
+      fit: p.commute === 'transit' ? 'strong' : 'possible',
+      reasoning: 'Useful when it reduces private vehicle travel and requires manageable outdoor waiting.',
+      limitation: 'A route-specific cleaner-air claim cannot be made from regional model data.',
+      source: SOURCES.transport
+    },
+    {
+      id: 'active', title: 'Walk or cycle', tag: polluted ? 'Use extra caution' : 'Low-emission option',
+      exposure: levels[polluted ? 2 : 1], emissions: 'No direct tailpipe emissions during the trip', cost: 'Usually inexpensive',
+      fit: polluted ? 'caution' : 'possible',
+      reasoning: polluted
+        ? 'Outdoor exertion can increase pollutant inhalation, so do not choose active travel solely for emission savings during elevated pollution.'
+        : 'Consider personal needs, route conditions, traffic safety and exposure. Low AQI is not zero risk.',
+      limitation: 'Actual breathed dose depends on pace, microenvironment, duration and individual circumstances.',
+      source: SOURCES.particleGuide
+    },
+    {
+      id: 'reschedule', title: 'Move a flexible outdoor task', tag: canShift ? 'Timing option' : 'May not be feasible',
+      exposure: 'Depends on forecast and time outdoors', emissions: 'No inherent emissions reduction from rescheduling alone', cost: 'Usually no purchase required',
+      fit: canShift ? 'possible' : 'limited',
+      reasoning: canShift
+        ? 'Only compare forecast hours inside your declared maximum time shift. A 15-minute change cannot be resolved by hourly forecasts.'
+        : 'A fixed or sub-hour shift cannot justify choosing another forecast hour; prefer feasible protective choices.',
+      limitation: 'Forecast timing is uncertain and can be different from conditions at street level.',
+      source: SOURCES.particleGuide
+    }
+  ];
+  const guidance = unknown ? 'Air quality is unavailable. Do not assume conditions are good; check official reports before choosing outdoor exertion.' : polluted
+    ? 'Pollution is elevated. Start with feasible exposure-protection steps, then compare emissions and cost.'
+    : 'Compare convenience, costs and emissions alongside any exposure concerns; current AQI is not a personal safety guarantee.';
+  return {
+    category: category.name,
+    guidance,
+    choices,
+    methodology: 'Qualitative decision aid based on U.S. AQI categories and declared preferences. Not personalized exposure measurement, route safety ranking or quantitative emissions modelling.',
+    inputUsed: { commute: p.commute, flexibility: p.flexibility, maxShiftMinutes: p.maxShiftMinutes }
+  };
+}
+
+export function buildCommunityActions(air, inputProfile = {}) {
+  const p = normalizeProfile(inputProfile);
+  const category = categoryForUsAqi(air?.current?.aqi);
+  const high = category.level >= 2;
+  return [
+    { id: 'school', audience: 'Schools & families', title: high ? 'Review outdoor activity plans' : 'Keep an AQI check in the routine',
+      action: high ? 'Share the sourced AQI forecast with school staff and ask about flexible indoor options for strenuous outdoor activity. Follow official school instructions.' : 'Check official AQI alerts before outdoor sports and explain the difference between a regional forecast and on-site conditions.',
+      source: SOURCES.activity },
+    { id: 'neighbours', audience: 'Housing communities', title: 'Reduce shared particle sources',
+      action: 'Discourage waste burning and indoor smoke in shared spaces. Share low-cost source-control and filtration guidance without promising a specific reduction.',
+      source: SOURCES.indoor },
+    { id: 'travel', audience: 'Workplaces & neighbours', title: 'Enable fewer unnecessary trips',
+      action: `Where genuinely possible, coordinate remote participation, combine errands and shared travel.${p.flexibility === 'fixed' ? ' Recognize that many essential schedules cannot move.' : ''}`,
+      source: SOURCES.transport }
+  ];
+}

@@ -1,0 +1,18 @@
+{
+  "name": "airwise-challenge-6",
+  "version": "4.0.0",
+  "private": true,
+  "type": "module",
+  "description": "AirWise v4: explainable daily air decisions, evidence-locked AI, source-labelled forecasts and community action briefs.",
+  "engines": {
+    "node": ">=20.10.0"
+  },
+  "scripts": {
+    "start": "node server/index.mjs",
+    "start:ai": "node --env-file=.env server/index.mjs",
+    "dev": "node --watch server/index.mjs",
+    "test": "node --test",
+    "check:size": "node scripts/check-size.mjs"
+  },
+  "license": "MIT"
+}

@@ -1,0 +1,362 @@
+/** Open-Meteo / CAMS model adapter with optional meteorology and WAQI ground-station comparison.
+ * Never relabel Copernicus CAMS model output as observed station data or India CPCB AQI.
+ */
+import { categoryForUsAqi } from './decisions.mjs';
+
+const AIR_URL = 'https://air-quality-api.open-meteo.com/v1/air-quality';
+const WEATHER_URL = 'https://api.open-meteo.com/v1/forecast';
+const GEO_URL = 'https://geocoding-api.open-meteo.com/v1/search';
+const WAQI_URL = 'https://api.waqi.info/feed/geo:';
+const cache = new Map();
+const inFlight = new Map();
+const fetcherCaches = new WeakMap();
+const fetcherInFlight = new WeakMap();
+const MAX_CACHE = 150;
+
+function storeFor(fetcher) {
+  if (fetcher === fetch) return cache;
+  let store = fetcherCaches.get(fetcher);
+  if (!store) {
+    store = new Map();
+    fetcherCaches.set(fetcher, store);
+  }
+  return store;
+}
+function pendingFor(fetcher) {
+  if (fetcher === fetch) return inFlight;
+  let map = fetcherInFlight.get(fetcher);
+  if (!map) {
+    map = new Map();
+    fetcherInFlight.set(fetcher, map);
+  }
+  return map;
+}
+function cacheGet(store, key) {
+  const hit = store.get(key);
+  if (hit && hit.expiresAt > Date.now()) return hit.value;
+  store.delete(key);
+  return null;
+}
+async function cachedFor(fetcher, key, ttlMs, work) {
+  const store = storeFor(fetcher);
+  const prior = cacheGet(store, key);
+  if (prior) return prior;
+  const pending = pendingFor(fetcher);
+  if (pending.has(key)) return pending.get(key);
+  const promise = (async () => {
+    const result = await work();
+    if (store.size >= MAX_CACHE) store.delete(store.keys().next().value);
+    store.set(key, { expiresAt: Date.now() + ttlMs, value: result });
+    return result;
+  })();
+  pending.set(key, promise);
+  try { return await promise; }
+  finally { pending.delete(key); }
+}
+function numberOrNull(value) {
+  return Number.isFinite(value) && value >= 0 ? value : null;
+}
+function finiteOrNull(value) {
+  return Number.isFinite(value) ? value : null;
+}
+function normalizeIsoMinute(value) {
+  return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T\d\d:\d\d$/.test(value) ? `${value}Z` : null;
+}
+export function validateCoordinates(latRaw, lonRaw) {
+  if (latRaw == null || lonRaw == null || String(latRaw).trim() === '' || String(lonRaw).trim() === '') throw new Error('City coordinates are required.');
+  const lat = Number(latRaw), lon = Number(lonRaw);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) {
+    throw new Error('Invalid latitude or longitude.');
+  }
+  return { lat, lon };
+}
+export async function requestJson(url, fetcher = fetch) {
+  let response;
+  try { response = await fetcher(url, { signal: AbortSignal.timeout(8500), headers: { accept: 'application/json' } }); }
+  catch { throw new Error('The air-quality provider is temporarily unreachable.'); }
+  if (!response.ok) throw new Error('The air-quality provider did not return available data.');
+  const payload = await response.json().catch(() => null);
+  if (!payload || payload.error) throw new Error('The air-quality provider returned invalid data.');
+  return payload;
+}
+export async function searchCities(term, fetcher = fetch) {
+  const city = String(term ?? '').trim();
+  if (city.length < 2 || city.length > 65) throw new Error('Enter a city name (2–65 characters).');
+  return cachedFor(fetcher, `geo:${city.toLowerCase()}`, 24 * 60 * 60_000, async () => {
+    const url = new URL(GEO_URL);
+    url.searchParams.set('name', city);
+    url.searchParams.set('count', '6');
+    url.searchParams.set('language', 'en');
+    const data = await requestJson(url.toString(), fetcher);
+    return (Array.isArray(data.results) ? data.results : []).filter(item =>
+      Number.isFinite(item.latitude) && Number.isFinite(item.longitude)
+    ).map(item => ({
+      id: item.id,
+      name: String(item.name).slice(0, 100),
+      region: String(item.admin1 ?? '').slice(0, 90),
+      country: String(item.country ?? '').slice(0, 70),
+      timezone: String(item.timezone ?? 'UTC').slice(0, 80),
+      latitude: item.latitude,
+      longitude: item.longitude
+    }));
+  });
+}
+export function dispersionNoteForWind(windSpeedKmh) {
+  if (!Number.isFinite(windSpeedKmh) || windSpeedKmh < 0) {
+    return 'Surface wind speed is unavailable; local dispersion cannot be characterized.';
+  }
+  if (windSpeedKmh < 8) return 'Light winds can slow dispersion of urban smoke and particulate matter.';
+  if (windSpeedKmh <= 18) return 'Moderate surface wind aids partial dispersion.';
+  return 'Stronger surface wind supports faster dispersion of local emissions.';
+}
+export function normalizeWeather(data) {
+  const c = data?.current;
+  if (!c || typeof c !== 'object') return null;
+  const temperatureRaw = finiteOrNull(c.temperature_2m);
+  const humidityRaw = numberOrNull(c.relative_humidity_2m);
+  const windRaw = numberOrNull(c.wind_speed_10m);
+  const pressureRaw = numberOrNull(c.surface_pressure);
+  if (temperatureRaw === null && humidityRaw === null && windRaw === null && pressureRaw === null) return null;
+  const temperatureC = temperatureRaw === null ? null : Math.round(temperatureRaw * 10) / 10;
+  const humidityPct = humidityRaw === null ? null : Math.round(humidityRaw);
+  const windSpeedKmh = windRaw === null ? null : Math.round(windRaw * 10) / 10;
+  const pressureHpa = pressureRaw === null ? null : Math.round(pressureRaw);
+  return {
+    temperatureC,
+    humidityPct,
+    windSpeedKmh,
+    pressureHpa,
+    dispersionNote: dispersionNoteForWind(windSpeedKmh),
+    source: 'Open-Meteo Weather'
+  };
+}
+async function fetchWeather(lat, lon, fetcher = fetch) {
+  try {
+    const url = new URL(WEATHER_URL);
+    url.searchParams.set('latitude', String(lat));
+    url.searchParams.set('longitude', String(lon));
+    url.searchParams.set('current', 'temperature_2m,relative_humidity_2m,wind_speed_10m,surface_pressure');
+    url.searchParams.set('timezone', 'GMT');
+    const data = await requestJson(url.toString(), fetcher);
+    return normalizeWeather(data);
+  } catch {
+    return null;
+  }
+}
+export async function getObservedStation(lat, lon, fetcher = fetch) {
+  const token = String(process.env.WAQI_API_TOKEN || '').trim();
+  if (!token) return null;
+  try {
+    const url = `${WAQI_URL}${lat};${lon}/?token=${encodeURIComponent(token)}`;
+    const response = await fetcher(url, { signal: AbortSignal.timeout(6000), headers: { accept: 'application/json' } });
+    if (!response?.ok) return null;
+    const payload = await response.json().catch(() => null);
+    if (!payload || payload.status !== 'ok' || !payload.data) return null;
+    const rawAqi = payload.data.aqi;
+    if (rawAqi === null || rawAqi === undefined || String(rawAqi).trim() === '') return null;
+    const aqi = Number(rawAqi);
+    if (!Number.isFinite(aqi) || aqi < 0) return null;
+    const stationName = String(payload.data.city?.name || 'Ground monitoring station').slice(0, 140);
+    const dominantRaw = payload.data.dominentpol ?? payload.data.dominantpol ?? null;
+    const dominantPollutant = dominantRaw ? String(dominantRaw).slice(0, 30) : null;
+    const time = payload.data.time?.iso || payload.data.time?.s || null;
+    const rawUrl = payload.data.city?.url;
+    const stationUrl = typeof rawUrl === 'string' && /^https?:\/\//i.test(rawUrl) ? rawUrl : null;
+    return {
+      stationName,
+      aqi,
+      dominantPollutant,
+      time,
+      source: 'WAQI Ground Station',
+      sourceType: 'observed',
+      url: stationUrl
+    };
+  } catch {
+    return null;
+  }
+}
+export function normalizeAir(data, coords, now = Date.now()) {
+  const c = data?.current ?? {};
+  const h = data?.hourly ?? {};
+  const times = Array.isArray(h.time) ? h.time : [];
+  const forecast = times.map((time, index) => ({
+    time: normalizeIsoMinute(time),
+    aqi: numberOrNull(h.us_aqi?.[index]),
+    pm25: numberOrNull(h.pm2_5?.[index]),
+    pm10: numberOrNull(h.pm10?.[index])
+  })).filter(point => point.time && Date.parse(point.time) >= now - 3600_000 && Date.parse(point.time) <= now + 30 * 3600_000).slice(0, 30);
+  const time = normalizeIsoMinute(c.time);
+  // A current-model timestamp is required: do not present stale or future data as current.
+  const current = {
+    aqi: numberOrNull(c.us_aqi),
+    pm25: numberOrNull(c.pm2_5),
+    pm10: numberOrNull(c.pm10),
+    no2: numberOrNull(c.nitrogen_dioxide),
+    o3: numberOrNull(c.ozone),
+    so2: numberOrNull(c.sulphur_dioxide),
+    co: numberOrNull(c.carbon_monoxide),
+    time
+  };
+  if (current.aqi === null && current.pm25 === null && current.pm10 === null) {
+    throw new Error('No usable air-quality reading is available for this location.');
+  }
+  const observationTime = time === null ? NaN : Date.parse(time);
+  if (!Number.isFinite(observationTime) || observationTime < now - 3 * 3600_000 || observationTime > now + 2 * 3600_000) {
+    throw new Error('Air-quality data are missing a recent model timestamp. Please check an official local source.');
+  }
+  return {
+    source: 'Open-Meteo / Copernicus CAMS',
+    sourceType: 'model',
+    index: 'US AQI',
+    disclosure: 'Modelled regional conditions, not a local ground-sensor reading or Indian CPCB AQI. Actual street-level exposure may differ.',
+    coordinates: { latitude: coords.lat, longitude: coords.lon },
+    retrievedAt: new Date(now).toISOString(),
+    current,
+    forecast,
+    weather: null,
+    observedStation: null
+  };
+}
+export async function getAir(rawLat, rawLon, fetcher = fetch) {
+  const coords = validateCoordinates(rawLat, rawLon);
+  // City-level precision only: no household GPS coordinates required.
+  const lat = Math.round(coords.lat * 100) / 100;
+  const lon = Math.round(coords.lon * 100) / 100;
+  const hasWaqi = Boolean(String(process.env.WAQI_API_TOKEN || '').trim());
+  return cachedFor(fetcher, `air:${lat}:${lon}:${hasWaqi ? 'waqi' : 'model'}`, 20 * 60_000, async () => {
+    const url = new URL(AIR_URL);
+    url.searchParams.set('latitude', String(lat));
+    url.searchParams.set('longitude', String(lon));
+    url.searchParams.set('current', 'us_aqi,pm2_5,pm10,nitrogen_dioxide,ozone,sulphur_dioxide,carbon_monoxide');
+    url.searchParams.set('hourly', 'us_aqi,pm2_5,pm10');
+    url.searchParams.set('forecast_hours', '30');
+    url.searchParams.set('timezone', 'GMT');
+    const [data, weather, observedStation] = await Promise.all([
+      requestJson(url.toString(), fetcher),
+      fetchWeather(lat, lon, fetcher),
+      getObservedStation(lat, lon, fetcher)
+    ]);
+    const air = normalizeAir(data, { lat, lon });
+    return { ...air, weather, observedStation };
+  });
+}
+export const PULSE_CITIES = Object.freeze([
+  Object.freeze({ id: 'delhi', name: 'Delhi', region: 'Delhi', country: 'India', timezone: 'Asia/Kolkata', latitude: 28.61, longitude: 77.21 }),
+  Object.freeze({ id: 'mumbai', name: 'Mumbai', region: 'Maharashtra', country: 'India', timezone: 'Asia/Kolkata', latitude: 19.08, longitude: 72.88 }),
+  Object.freeze({ id: 'bengaluru', name: 'Bengaluru', region: 'Karnataka', country: 'India', timezone: 'Asia/Kolkata', latitude: 12.97, longitude: 77.59 }),
+  Object.freeze({ id: 'kolkata', name: 'Kolkata', region: 'West Bengal', country: 'India', timezone: 'Asia/Kolkata', latitude: 22.57, longitude: 88.36 })
+]);
+export async function getLiveCityPulse(fetcher = fetch) {
+  return cachedFor(fetcher, 'pulse:cities', 10 * 60_000, async () => {
+    const cities = await Promise.all(PULSE_CITIES.map(async city => {
+      try {
+        const airUrl = new URL(AIR_URL);
+        airUrl.searchParams.set('latitude', String(city.latitude));
+        airUrl.searchParams.set('longitude', String(city.longitude));
+        airUrl.searchParams.set('current', 'us_aqi,pm2_5');
+        airUrl.searchParams.set('timezone', 'GMT');
+
+        const weatherUrl = new URL(WEATHER_URL);
+        weatherUrl.searchParams.set('latitude', String(city.latitude));
+        weatherUrl.searchParams.set('longitude', String(city.longitude));
+        weatherUrl.searchParams.set('current', 'wind_speed_10m,temperature_2m');
+        weatherUrl.searchParams.set('timezone', 'GMT');
+
+        const [airData, weatherData] = await Promise.all([
+          requestJson(airUrl.toString(), fetcher),
+          requestJson(weatherUrl.toString(), fetcher).catch(() => null)
+        ]);
+        const c = airData?.current ?? {};
+        const aqi = numberOrNull(c.us_aqi);
+        const pm25 = numberOrNull(c.pm2_5);
+        const time = normalizeIsoMinute(c.time);
+        if (aqi === null) throw new Error('Unavailable');
+        const cat = categoryForUsAqi(aqi);
+        const windRaw = numberOrNull(weatherData?.current?.wind_speed_10m);
+        const windSpeed = windRaw === null ? null : Math.round(windRaw * 10) / 10;
+        const tempRaw = finiteOrNull(weatherData?.current?.temperature_2m);
+        const temperatureC = tempRaw === null ? null : Math.round(tempRaw * 10) / 10;
+        return {
+          ...city,
+          aqi,
+          pm25,
+          windSpeed,
+          temperatureC,
+          category: cat.name,
+          tone: cat.tone,
+          time,
+          index: 'US AQI',
+          sourceType: 'model',
+          source: 'Open-Meteo / Copernicus CAMS'
+        };
+      } catch {
+        return {
+          ...city,
+          aqi: null,
+          pm25: null,
+          windSpeed: null,
+          category: 'Unavailable',
+          tone: 'unknown',
+          time: null,
+          index: 'US AQI',
+          sourceType: 'model',
+          source: 'Open-Meteo / Copernicus CAMS',
+          error: 'Temporarily unavailable'
+        };
+      }
+    }));
+    return {
+      cities,
+      retrievedAt: new Date().toISOString(),
+      index: 'US AQI',
+      sourceType: 'model',
+      source: 'Open-Meteo / Copernicus CAMS',
+      disclosure: 'Modelled regional conditions (US AQI), not local ground-sensor readings or Indian CPCB AQI.'
+    };
+  });
+}
+export const DEMO_SCENARIOS = Object.freeze([
+  { id:'unhealthy', label:'Unhealthy sample (US AQI 183)' },
+  { id:'hazardous', label:'Hazardous sample (US AQI 355)' },
+  { id:'moderate', label:'Moderate sample (US AQI 77)' },
+  { id:'unavailable', label:'Missing data sample' }
+]);
+export function getSimulatedAir(now = Date.now(), scenario = 'unhealthy') {
+  if (!DEMO_SCENARIOS.some(x=>x.id===scenario)) throw new Error('Unknown synthetic scenario.');
+  const anchor = Math.floor(now / 3600_000) * 3600_000;
+  const base = scenario === 'hazardous' ? 355 : scenario === 'moderate' ? 77 : 183;
+  const unavailable = scenario === 'unavailable';
+  const forecast = Array.from({ length: 30 }, (_, i) => {
+    const variation = Math.round(29 * Math.cos(i * 0.48) + 18 * Math.sin(i * 0.2));
+    const aqi = unavailable ? null : Math.max(1, base - 13 + variation);
+    return {
+      time: new Date(anchor + i * 3600_000).toISOString(),
+      aqi,
+      pm25: aqi === null ? null : Math.round((aqi * 0.44) * 10) / 10,
+      pm10: aqi === null ? null : Math.round(aqi * 0.72)
+    };
+  });
+  const syntheticWeather = unavailable ? null : scenario === 'hazardous'
+    ? { temperatureC: 16.4, humidityPct: 74, windSpeedKmh: 4.2, pressureHpa: 1016, dispersionNote: dispersionNoteForWind(4.2), source: 'Synthetic sample meteorology' }
+    : scenario === 'moderate'
+      ? { temperatureC: 26.2, humidityPct: 48, windSpeedKmh: 15.4, pressureHpa: 1010, dispersionNote: dispersionNoteForWind(15.4), source: 'Synthetic sample meteorology' }
+      : { temperatureC: 22.8, humidityPct: 61, windSpeedKmh: 6.5, pressureHpa: 1013, dispersionNote: dispersionNoteForWind(6.5), source: 'Synthetic sample meteorology' };
+  return {
+    source: `Synthetic sample (${scenario})`, sourceType: 'simulation', scenario, index: 'US AQI',
+    disclosure: 'DEMO ONLY — generated sample values, not actual air-quality observations or forecasts. Do not use for health decisions.',
+    coordinates: null, retrievedAt: new Date(now).toISOString(),
+    current: {
+      aqi: unavailable ? null : base,
+      pm25: unavailable ? null : Math.round(base * 0.44 * 10) / 10,
+      pm10: unavailable ? null : Math.round(base * 0.72),
+      no2: unavailable ? null : Math.round(base * 0.25 * 10) / 10,
+      o3: unavailable ? null : Math.round((45 + base * 0.14) * 10) / 10,
+      so2: unavailable ? null : Math.round(base * 0.08 * 10) / 10,
+      co: unavailable ? null : Math.round(base * 4.2),
+      time: new Date(now).toISOString()
+    },
+    forecast: unavailable ? [] : forecast,
+    weather: syntheticWeather,
+    observedStation: null
+  };
+}

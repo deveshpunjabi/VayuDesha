@@ -1,0 +1,813 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#FFFFFF">
+  <meta name="description" content="AirWise — Urban Air Quality Assistant for daily smog planning, indoor air sizing, and practical low-emission choices.">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/app.js" type="module"></script>
+  <title>AirWise — Urban Air Quality Assistant</title>
+</head>
+<body>
+  <a class="skip-link" href="#main-content">Skip to main content</a>
+
+  <header class="site-header" role="banner">
+    <div class="header-inner">
+      <div class="header-brand">
+        <a href="#overview" class="brand-link" id="brand-home-link" aria-label="AirWise Home">
+          <span class="brand-mark" aria-hidden="true">
+            <svg viewBox="0 0 32 32" width="30" height="30" fill="none">
+              <rect width="32" height="32" rx="8" fill="#111827"/>
+              <path d="M7.5 12h11a2.75 2.75 0 1 0-2.4-4.1" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M7.5 17.5h15a2.75 2.75 0 1 1-2.4 4.1" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M7.5 23h7.5" stroke="#9CA3AF" stroke-width="2.2" stroke-linecap="round"/>
+            </svg>
+          </span>
+          <span class="brand-name">AirWise</span>
+        </a>
+
+        <nav class="header-nav" aria-label="Primary view">
+          <button type="button" id="nav-home-btn" class="nav-view-btn active" aria-current="page">Cities</button>
+          <button type="button" id="nav-dashboard-btn" class="nav-view-btn">Dashboard</button>
+        </nav>
+      </div>
+
+      <div class="header-controls">
+        <div class="location-pill" title="Selected location">
+          <svg class="icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/>
+            <circle cx="12" cy="10" r="3"/>
+          </svg>
+          <span id="header-location">No city selected</span>
+        </div>
+
+        <button type="button" id="open-profile-btn" class="profile-trigger" aria-controls="profile" aria-expanded="false">
+          <svg class="icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 20v-6"/><path d="M12 10V4"/><path d="M4 20v-2"/><path d="M4 14V4"/><path d="M20 20v-8"/><path d="M20 8V4"/>
+            <line x1="2" y1="14" x2="6" y2="14"/><line x1="10" y1="10" x2="14" y2="10"/><line x1="18" y1="12" x2="22" y2="12"/>
+          </svg>
+          <span id="profile-summary-pill" class="profile-summary-pill">Standard · Transit · Limited</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main id="main-content" class="page-main">
+    <!-- =====================================================
+         VIEW 1: LANDING / LIVE CITIES OVERVIEW
+         ===================================================== -->
+    <section id="landing-view" class="landing-view" aria-labelledby="landing-title">
+      <div class="container">
+        <div class="hero-stage">
+          <div class="hero-copy">
+            <h1 id="landing-title">Plan your day around real air quality.</h1>
+            <p class="hero-subtitle">Live regional air forecasts, smog wind conditions, and practical daily routines tailored to your household schedule, commute, and budget.</p>
+          </div>
+
+          <div class="hero-search-card">
+            <form id="landing-city-form" class="hero-search-form" autocomplete="off">
+              <label for="landing-city-input" class="sr-only">Search any city</label>
+              <div class="hero-search-bar">
+                <svg class="icon search-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>
+                </svg>
+                <input id="landing-city-input" type="search" placeholder="Search any city (Delhi, Mumbai, Bengaluru, London...)" minlength="2" maxlength="65" required>
+                <button type="submit" class="btn btn-primary">Check air</button>
+              </div>
+            </form>
+            <div id="landing-city-results" class="city-results" aria-live="polite"></div>
+
+            <div class="hero-quick-bar">
+              <div class="demo-inline">
+                <label for="landing-demo-scenario" class="demo-label">Try a sample:</label>
+                <select id="landing-demo-scenario" class="select-compact" aria-label="Sample air quality scenario">
+                  <option value="unhealthy">Unhealthy (US AQI 183)</option>
+                  <option value="hazardous">Hazardous (US AQI 355)</option>
+                  <option value="moderate">Moderate (US AQI 77)</option>
+                  <option value="unavailable">Data unavailable</option>
+                </select>
+                <button type="button" id="landing-demo-button" class="btn btn-secondary btn-sm">Load</button>
+              </div>
+
+              <button type="button" id="open-dashboard-cta" class="btn btn-link-arrow">
+                <span>Open full dashboard</span>
+                <svg class="icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- LIVE MULTI-CITY MONITOR -->
+        <section class="pulse-section" aria-labelledby="pulse-title">
+          <div class="section-head-row">
+            <div>
+              <h2 id="pulse-title">Live city monitor</h2>
+              <p class="small muted">Select any city to inspect hourly trends, pollutants, and your tailored schedule.</p>
+            </div>
+            <div class="pulse-meta">
+              <span class="live-dot is-live" aria-hidden="true"></span>
+              <span id="pulse-updated" class="muted small">Updating live readings...</span>
+            </div>
+          </div>
+
+          <div id="pulse-grid" class="pulse-grid" aria-live="polite">
+            <div class="pulse-card pulse-skeleton" aria-busy="true">
+              <div class="pulse-card-head"><span class="pulse-city">Delhi</span><span class="pill pill-neutral">CAMS MODEL</span></div>
+              <div class="pulse-aqi-row"><span class="pulse-aqi">—</span><span class="pulse-unit">US AQI</span></div>
+              <p class="muted small">Loading live data...</p>
+            </div>
+            <div class="pulse-card pulse-skeleton" aria-busy="true">
+              <div class="pulse-card-head"><span class="pulse-city">Mumbai</span><span class="pill pill-neutral">CAMS MODEL</span></div>
+              <div class="pulse-aqi-row"><span class="pulse-aqi">—</span><span class="pulse-unit">US AQI</span></div>
+              <p class="muted small">Loading live data...</p>
+            </div>
+            <div class="pulse-card pulse-skeleton" aria-busy="true">
+              <div class="pulse-card-head"><span class="pulse-city">Bengaluru</span><span class="pill pill-neutral">CAMS MODEL</span></div>
+              <div class="pulse-aqi-row"><span class="pulse-aqi">—</span><span class="pulse-unit">US AQI</span></div>
+              <p class="muted small">Loading live data...</p>
+            </div>
+            <div class="pulse-card pulse-skeleton" aria-busy="true">
+              <div class="pulse-card-head"><span class="pulse-city">Kolkata</span><span class="pill pill-neutral">CAMS MODEL</span></div>
+              <div class="pulse-aqi-row"><span class="pulse-aqi">—</span><span class="pulse-unit">US AQI</span></div>
+              <p class="muted small">Loading live data...</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- PRACTICAL CAPABILITIES & SCALE REFERENCE -->
+        <section class="overview-bento" aria-label="Features and AQI scale reference">
+          <div class="bento-main">
+            <h2>Built for everyday smog decisions</h2>
+            <div class="bento-list">
+              <div class="bento-item">
+                <h3>Six pollutants + wind dispersion</h3>
+                <p>See live PM2.5, PM10, NO₂, O₃, SO₂, CO, 24-hour forecasts, and surface wind conditions side by side.</p>
+              </div>
+              <div class="bento-item">
+                <h3>Schedules that respect real limits</h3>
+                <p>Fixed school or shift timings stay fixed. Only flexible routines get alternate-hour comparisons.</p>
+              </div>
+              <div class="bento-item">
+                <h3>Practical indoor &amp; budget steps</h3>
+                <p>Calculate room smoke CADR, prioritize free source control, and compare fan vs. purifier options honestly.</p>
+              </div>
+              <div class="bento-item">
+                <h3>Checked guidance &amp; community sharing</h3>
+                <p>Ask questions backed by EPA and WHO references, and download anonymous briefs for schools or resident groups.</p>
+              </div>
+            </div>
+          </div>
+
+          <aside class="bento-scale-card" aria-label="US AQI scale guide">
+            <div class="bento-scale-head">
+              <h3>US AQI Reference</h3>
+              <span class="pill pill-neutral">U.S. EPA</span>
+            </div>
+            <div class="obs-scale-legend">
+              <div class="scale-legend-item"><span class="swatch tone-good"></span><span class="scale-range">0–50</span><span class="scale-label">Good</span></div>
+              <div class="scale-legend-item"><span class="swatch tone-moderate"></span><span class="scale-range">51–100</span><span class="scale-label">Moderate</span></div>
+              <div class="scale-legend-item"><span class="swatch tone-sensitive"></span><span class="scale-range">101–150</span><span class="scale-label">Sensitive Groups</span></div>
+              <div class="scale-legend-item"><span class="swatch tone-unhealthy"></span><span class="scale-range">151–200</span><span class="scale-label">Unhealthy</span></div>
+              <div class="scale-legend-item"><span class="swatch tone-very-unhealthy"></span><span class="scale-range">201–300</span><span class="scale-label">Very Unhealthy</span></div>
+              <div class="scale-legend-item"><span class="swatch tone-hazardous"></span><span class="scale-range">301+</span><span class="scale-label">Hazardous</span></div>
+            </div>
+            <p class="scale-footnote">Live readings come from Open-Meteo / Copernicus CAMS regional models on the US AQI scale, not local ground sensors or India CPCB AQI.</p>
+          </aside>
+        </section>
+      </div>
+    </section>
+
+    <!-- =====================================================
+         VIEW 2: FOCUSED 4-TAB DASHBOARD
+         ===================================================== -->
+    <section id="dashboard-view" class="dashboard-view hidden" aria-label="AirWise Dashboard">
+      <div class="container">
+        <!-- SLEEK COMPACT DASHBOARD BAR -->
+        <div class="command-bar">
+          <div class="command-row">
+            <form id="city-form" class="command-search" autocomplete="off">
+              <label for="city-input" class="sr-only">Search city</label>
+              <div class="search-input-wrap">
+                <svg class="icon search-icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>
+                </svg>
+                <input id="city-input" type="search" placeholder="Switch city..." minlength="2" maxlength="65" required>
+              </div>
+              <button type="submit" class="btn btn-primary btn-sm">Go</button>
+            </form>
+
+            <div class="command-demo">
+              <label for="demo-scenario" class="sr-only">Sample scenario</label>
+              <select id="demo-scenario" class="select-compact" aria-label="Sample scenario">
+                <option value="unhealthy">Sample: Unhealthy (183)</option>
+                <option value="hazardous">Sample: Hazardous (355)</option>
+                <option value="moderate">Sample: Moderate (77)</option>
+                <option value="unavailable">Sample: Unavailable</option>
+              </select>
+              <button type="button" id="demo-button" class="btn btn-secondary btn-sm">Load</button>
+            </div>
+
+            <div class="toolbar-actions">
+              <button type="button" id="refresh-button" class="btn btn-ghost btn-sm" disabled title="Refresh data" aria-label="Refresh data">
+                <svg class="icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/>
+                  <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/><path d="M8 16H3v5"/>
+                </svg>
+                <span>Refresh</span>
+              </button>
+              <button type="button" id="download-brief" class="btn btn-ghost btn-sm" disabled>
+                <svg class="icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+                <span>Export</span>
+              </button>
+              <button type="button" id="print-brief" class="btn btn-ghost btn-sm" disabled>
+                <svg class="icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect width="12" height="8" x="6" y="14"/>
+                </svg>
+                <span>Print</span>
+              </button>
+            </div>
+          </div>
+
+          <div id="city-results" class="city-results" aria-live="polite"></div>
+
+          <div class="status-strip">
+            <div class="toolbar-meta">
+              <span class="toolbar-chip">
+                <span class="live-dot" aria-hidden="true"></span>
+                <span id="brief-status">WAITING FOR A CITY</span>
+              </span>
+              <span class="toolbar-divider" aria-hidden="true"></span>
+              <span id="live-sync-status" class="toolbar-text">Sync idle</span>
+              <span class="toolbar-divider" aria-hidden="true"></span>
+              <span id="model-mode" class="toolbar-text muted">Ready</span>
+            </div>
+            <div id="status-message" class="status-message" role="status" aria-live="polite">Select a city or load a sample scenario.</div>
+          </div>
+
+          <div id="simulation-banner" class="simulation-banner hidden" role="alert">
+            <svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/>
+              <path d="M12 9v4"/><path d="M12 17h.01"/>
+            </svg>
+            <span><strong>SIMULATION MODE</strong> — Sample demo numbers only, not live conditions. Do not use for health decisions.</span>
+          </div>
+        </div>
+
+        <!-- 4-TAB NAVIGATION BAR -->
+        <div class="tab-bar-wrap">
+          <div class="tab-bar" role="tablist" aria-label="Dashboard sections">
+            <button type="button" role="tab" id="tab-btn-live" class="tab-btn active" data-tab="live" aria-selected="true" aria-controls="tab-live">
+              <svg class="icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2"/>
+              </svg>
+              <span>Air &amp; Forecast</span>
+            </button>
+            <button type="button" role="tab" id="tab-btn-plan" class="tab-btn" data-tab="plan" aria-selected="false" aria-controls="tab-plan">
+              <svg class="icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <rect width="18" height="18" x="3" y="4" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/>
+              </svg>
+              <span>Daily Plan &amp; Trade-Offs</span>
+            </button>
+            <button type="button" role="tab" id="tab-btn-indoor" class="tab-btn" data-tab="indoor" aria-selected="false" aria-controls="tab-indoor">
+              <svg class="icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
+              </svg>
+              <span>Indoor &amp; Travel Tools</span>
+            </button>
+            <button type="button" role="tab" id="tab-btn-community" class="tab-btn" data-tab="community" aria-selected="false" aria-controls="tab-community">
+              <svg class="icon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+              </svg>
+              <span>Ask AirWise &amp; Community</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- =================================================
+             TAB PANEL 1: AIR & FORECAST
+             ================================================= -->
+        <div id="tab-live" class="tab-panel" role="tabpanel" aria-labelledby="tab-btn-live">
+          <div class="live-hero-grid">
+            <section id="air-hero" class="panel air-hero" data-tone="unknown" aria-labelledby="air-title">
+              <div class="panel-top">
+                <span class="eyebrow">MODELLED OUTDOOR CONDITIONS</span>
+                <span class="pill pill-neutral" id="data-source-badge">AWAITING DATA</span>
+              </div>
+
+              <div class="air-hero-header">
+                <h1 class="city-title" id="air-title">Choose a city</h1>
+                <p class="muted small" id="air-timestamp">No forecast loaded yet</p>
+              </div>
+
+              <div class="aqi-display-row">
+                <strong id="aqi-number" class="aqi-figure">—</strong>
+                <div class="aqi-unit-stack">
+                  <span class="aqi-unit">US AQI</span>
+                  <span id="aqi-category" class="aqi-category-badge">Not available</span>
+                </div>
+              </div>
+
+              <div class="aqi-scale-block" aria-label="US AQI scale position">
+                <div class="aqi-scale-track">
+                  <div class="aqi-scale-segments" aria-hidden="true">
+                    <span class="seg seg-good" title="Good (0–50)"></span>
+                    <span class="seg seg-moderate" title="Moderate (51–100)"></span>
+                    <span class="seg seg-sensitive" title="Sensitive Groups (101–150)"></span>
+                    <span class="seg seg-unhealthy" title="Unhealthy (151–200)"></span>
+                    <span class="seg seg-very-unhealthy" title="Very Unhealthy (201–300)"></span>
+                    <span class="seg seg-hazardous" title="Hazardous (301+)"></span>
+                  </div>
+                  <span id="aqi-scale-marker" class="aqi-scale-marker hidden" aria-hidden="true"></span>
+                </div>
+                <div class="aqi-scale-ticks" aria-hidden="true">
+                  <span>0</span><span>50</span><span>100</span><span>150</span><span>200</span><span>300+</span>
+                </div>
+              </div>
+
+              <p class="air-description" id="air-description">Select a city to view live modelled conditions.</p>
+            </section>
+
+            <section class="panel outlook-card" aria-labelledby="outlook-title">
+              <div class="panel-top">
+                <span class="eyebrow">HOUSEHOLD OUTLOOK</span>
+                <button type="button" class="btn-inline-link" id="outlook-edit-profile">Edit profile</button>
+              </div>
+              <h2 id="outlook-title" class="outlook-heading">Today's summary</h2>
+              <p id="outlook-headline" class="outlook-lead">Select a city to generate your household outlook.</p>
+
+              <div class="outlook-window-box">
+                <span class="eyebrow">SCHEDULE TIMING</span>
+                <strong id="best-time" class="best-time-value">Waiting for forecast</strong>
+                <p id="best-time-caption" class="small muted">Lower forecast hours are approximate, not a safety guarantee.</p>
+              </div>
+            </section>
+          </div>
+
+          <!-- OPTIONAL OBSERVED GROUND STATION -->
+          <section id="observed-station-card" class="panel observed-station-card hidden" aria-labelledby="observed-station-heading">
+            <div class="observed-station-body">
+              <div class="observed-station-copy">
+                <span class="pill pill-observed">OBSERVED GROUND STATION</span>
+                <h2 id="observed-station-heading" class="sr-only">Observed ground station reading</h2>
+                <strong id="observed-station-name">Ground monitor</strong>
+                <p id="observed-station-meta" class="small muted">Nearest ground monitoring station reading.</p>
+              </div>
+              <div class="observed-station-reading">
+                <strong id="observed-station-aqi" class="mono-num">—</strong>
+                <span class="small muted">US AQI</span>
+              </div>
+            </div>
+          </section>
+
+          <!-- MULTI-POLLUTANT BREAKDOWN -->
+          <section class="telemetry-section" aria-labelledby="pollutants-title">
+            <div class="section-subhead">
+              <h2 id="pollutants-title" class="section-label">Pollutant breakdown</h2>
+              <span class="small muted">Modelled surface concentrations (µg/m³)</span>
+            </div>
+            <div class="pollutant-grid">
+              <div class="metric-card">
+                <div class="metric-head"><span class="metric-symbol">PM2.5</span><span class="metric-sub">Fine particles</span></div>
+                <div class="metric-val-row"><strong id="pm25-number" class="mono-num">—</strong><span class="metric-unit">µg/m³</span></div>
+                <div class="metric-bar"><span id="pm25-bar"></span></div>
+              </div>
+              <div class="metric-card">
+                <div class="metric-head"><span class="metric-symbol">PM10</span><span class="metric-sub">Coarse dust</span></div>
+                <div class="metric-val-row"><strong id="pm10-number" class="mono-num">—</strong><span class="metric-unit">µg/m³</span></div>
+                <div class="metric-bar"><span id="pm10-bar"></span></div>
+              </div>
+              <div class="metric-card">
+                <div class="metric-head"><span class="metric-symbol">NO₂</span><span class="metric-sub">Nitrogen dioxide</span></div>
+                <div class="metric-val-row"><strong id="no2-number" class="mono-num">—</strong><span class="metric-unit">µg/m³</span></div>
+                <div class="metric-bar"><span id="no2-bar"></span></div>
+              </div>
+              <div class="metric-card">
+                <div class="metric-head"><span class="metric-symbol">O₃</span><span class="metric-sub">Ground ozone</span></div>
+                <div class="metric-val-row"><strong id="o3-number" class="mono-num">—</strong><span class="metric-unit">µg/m³</span></div>
+                <div class="metric-bar"><span id="o3-bar"></span></div>
+              </div>
+              <div class="metric-card">
+                <div class="metric-head"><span class="metric-symbol">SO₂</span><span class="metric-sub">Sulfur dioxide</span></div>
+                <div class="metric-val-row"><strong id="so2-number" class="mono-num">—</strong><span class="metric-unit">µg/m³</span></div>
+                <div class="metric-bar"><span id="so2-bar"></span></div>
+              </div>
+              <div class="metric-card">
+                <div class="metric-head"><span class="metric-symbol">CO</span><span class="metric-sub">Carbon monoxide</span></div>
+                <div class="metric-val-row"><strong id="co-number" class="mono-num">—</strong><span class="metric-unit">µg/m³</span></div>
+                <div class="metric-bar"><span id="co-bar"></span></div>
+              </div>
+            </div>
+          </section>
+
+          <!-- WEATHER & DISPERSION -->
+          <section class="panel meteorology-strip" aria-labelledby="weather-title">
+            <div class="meteorology-top">
+              <h2 id="weather-title" class="section-label">Weather &amp; smog dispersion</h2>
+              <p id="weather-dispersion" class="dispersion-note">Load a city to view local wind dispersion conditions.</p>
+            </div>
+            <div class="weather-grid">
+              <div class="weather-cell"><span class="weather-label">Wind speed</span><strong id="weather-wind" class="mono-num">—</strong></div>
+              <div class="weather-cell"><span class="weather-label">Humidity</span><strong id="weather-humidity" class="mono-num">—</strong></div>
+              <div class="weather-cell"><span class="weather-label">Temperature</span><strong id="weather-temp" class="mono-num">—</strong></div>
+              <div class="weather-cell"><span class="weather-label">Pressure</span><strong id="weather-pressure" class="mono-num">—</strong></div>
+            </div>
+          </section>
+
+          <!-- 24-HOUR FORECAST CHART -->
+          <section class="panel forecast-panel" aria-labelledby="forecast-title">
+            <div class="panel-header-row">
+              <div>
+                <h2 id="forecast-title">Next 24 hours</h2>
+                <p class="small muted">Hourly modelled US AQI. Hover or focus any point for exact PM2.5.</p>
+              </div>
+              <div id="forecast-tooltip" class="forecast-tooltip" aria-live="polite">Select a point on the chart</div>
+            </div>
+            <div class="chart-wrap">
+              <svg id="forecast-chart" viewBox="0 0 920 220" role="img" aria-label="Hourly US AQI forecast chart">
+                <text x="28" y="110" fill="#6B7280" font-size="15">Forecast loads after selecting a city</text>
+              </svg>
+            </div>
+            <div id="forecast-hours" class="chart-labels"></div>
+            <p id="forecast-text" class="small muted" aria-live="polite">No forecast loaded.</p>
+          </section>
+
+          <!-- TOP 3 STEPS -->
+          <section id="daily-brief" class="panel brief-section" aria-labelledby="brief-title">
+            <div class="panel-header-row">
+              <div>
+                <h2 id="brief-title">Top three steps for today</h2>
+                <p class="small muted">Track actions you plan to follow. Saved only in your browser.</p>
+              </div>
+              <div class="pill pill-accent" id="brief-progress" aria-live="polite">0 of 3 considered</div>
+            </div>
+            <div id="brief-checklist" class="brief-checklist">
+              <div class="empty-state">Load a city or sample scenario to view your checklist.</div>
+            </div>
+          </section>
+        </div>
+
+        <!-- =================================================
+             TAB PANEL 2: DAILY PLAN & TRADE-OFFS
+             ================================================= -->
+        <div id="tab-plan" class="tab-panel hidden" role="tabpanel" aria-labelledby="tab-btn-plan">
+          <section id="daily-routine" class="panel daily-routine" aria-labelledby="routine-title">
+            <div class="panel-header-row">
+              <div>
+                <h2 id="routine-title">Daily schedule</h2>
+                <p class="small muted">Approximate routine template based on your typical commute, outdoor, and cooking times.</p>
+              </div>
+              <span id="routine-source" class="pill pill-neutral">Waiting for data</span>
+            </div>
+            <p id="routine-notice" class="routine-notice" aria-live="polite">Choose a city or sample scenario to build your schedule.</p>
+            <ol id="routine-timeline" class="routine-timeline">
+              <li class="empty-state">Your daily schedule appears after loading air data.</li>
+            </ol>
+          </section>
+
+          <section id="scenario-proof" class="panel scenario-proof" aria-labelledby="scenario-proof-title">
+            <div class="panel-header-row">
+              <div>
+                <h2 id="scenario-proof-title">Compare household situations</h2>
+                <p class="small muted">Test how changing one constraint adjusts recommendations under the exact same air reading.</p>
+              </div>
+            </div>
+
+            <form id="compare-form" class="inline-control-form">
+              <label for="scenario-option" class="field-label">Compare current household with</label>
+              <div class="inline-control-row">
+                <select id="scenario-option">
+                  <option value="child">Adding a child to the household</option>
+                  <option value="cycling">Switching commute to cycling</option>
+                  <option value="fixed">Having a fixed work or school schedule</option>
+                  <option value="no_budget">Having no budget for equipment</option>
+                </select>
+                <button id="scenario-button" class="btn btn-primary" type="submit" disabled>Compare</button>
+              </div>
+            </form>
+
+            <div id="scenario-result" class="scenario-result" role="status" aria-live="polite">Load a city or sample scenario to compare plans.</div>
+            <p class="small muted">Shows rule changes under identical outdoor conditions. Not a personal exposure or CO₂ calculation.</p>
+          </section>
+
+          <section id="decision-lab" class="panel decision-section" aria-labelledby="decision-title">
+            <div class="panel-header-row">
+              <div>
+                <h2 id="decision-title">Commute &amp; routine trade-offs</h2>
+                <p class="muted small" id="choices-headline">Compare options across exposure, emissions, and cost.</p>
+              </div>
+            </div>
+            <div id="choice-cards" class="choice-grid">
+              <div class="empty-state">Trade-off comparisons appear after loading a location.</div>
+            </div>
+            <p class="small muted" id="choices-methodology">Qualitative comparison based on US AQI category and your profile.</p>
+          </section>
+
+          <section class="panel timing-shift-panel" aria-labelledby="timing-shift-title">
+            <h2 id="timing-shift-title">Departure hour comparison</h2>
+            <p class="small muted">Compares modelled outdoor PM2.5 at your usual departure hour against a lower-pollution hour within your allowed shift.</p>
+            <div id="comparison-result" class="comparison-result">Select a city to check alternate departure hours.</div>
+            <p class="small muted">Hourly forecasts cannot evaluate 15-minute shifts or measure personal inhaled dose.</p>
+          </section>
+        </div>
+
+        <!-- =================================================
+             TAB PANEL 3: INDOOR & TRAVEL TOOLS
+             ================================================= -->
+        <div id="tab-indoor" class="tab-panel hidden" role="tabpanel" aria-labelledby="tab-btn-indoor">
+          <div class="lab-grid">
+            <section class="panel impact-tool" aria-labelledby="cadr-title">
+              <h2 id="cadr-title">Room air cleaner &amp; source planner</h2>
+              <p class="small muted">Estimates minimum smoke CADR using EPA room-size rules and lists source-specific indoor actions.</p>
+
+              <form id="cadr-form" class="tool-form">
+                <div class="form-field">
+                  <label for="room-area" class="field-label">Room area (m²)</label>
+                  <div class="inline-input-action">
+                    <input id="room-area" type="number" min="4" max="200" step="0.5" value="15" required>
+                    <button class="btn btn-primary" type="submit">Calculate</button>
+                  </div>
+                </div>
+                <div class="form-field">
+                  <label for="room-source" class="field-label">Main indoor particle source</label>
+                  <select id="room-source">
+                    <option value="mixed">Mixed or unknown</option>
+                    <option value="cooking">Cooking smoke</option>
+                    <option value="incense">Candles, incense or smoke</option>
+                    <option value="dust">Household dust</option>
+                  </select>
+                </div>
+              </form>
+
+              <p id="cadr-result" class="cadr-result" aria-live="polite">Enter your room size to estimate minimum smoke CADR.</p>
+              <div id="room-plan-result" class="room-plan-result" aria-live="polite"></div>
+              <p class="small muted">Assumes a standard ~2.4 m ceiling. Ordinary room fans circulate air and do not filter PM2.5.</p>
+            </section>
+
+            <section class="panel impact-tool" aria-labelledby="travel-impact-title">
+              <h2 id="travel-impact-title">Motorized travel avoided</h2>
+              <p class="small muted">Calculates total vehicle-kilometres avoided when skipping a car or scooter round trip.</p>
+
+              <form id="impact-form" class="tool-form">
+                <div class="form-field">
+                  <label for="trip-distance" class="field-label">One-way distance (km)</label>
+                  <input id="trip-distance" type="number" min="0.1" max="150" step="0.1" value="8" required>
+                </div>
+                <div class="form-two-col">
+                  <div class="form-field">
+                    <label for="trip-count" class="field-label">Round trips avoided</label>
+                    <select id="trip-count">
+                      <option value="1">1 round trip</option>
+                      <option value="2">2 round trips</option>
+                      <option value="3">3 round trips</option>
+                      <option value="4">4 round trips</option>
+                      <option value="5">5 round trips</option>
+                      <option value="6">6 round trips</option>
+                      <option value="7">7 round trips</option>
+                    </select>
+                  </div>
+                  <div class="form-field">
+                    <label for="trip-mode" class="field-label">Vehicle type</label>
+                    <select id="trip-mode">
+                      <option value="car">Car</option>
+                      <option value="scooter">Scooter</option>
+                    </select>
+                  </div>
+                </div>
+                <button class="btn btn-primary" type="submit">Calculate</button>
+              </form>
+
+              <p id="impact-result" class="cadr-result" aria-live="polite">Enter distance and trips to calculate vehicle-kilometres avoided.</p>
+            </section>
+          </div>
+
+          <section id="recommendations" class="panel recommendations-section" aria-labelledby="recommendations-title">
+            <div class="panel-header-row">
+              <div>
+                <h2 id="recommendations-title">All recommendations</h2>
+                <p class="small muted">Filter guidance by outdoors, home, travel, or family.</p>
+              </div>
+            </div>
+
+            <div class="filter-row" role="group" aria-label="Recommendation categories">
+              <button class="filter-chip active" type="button" data-filter="all" aria-pressed="true">All</button>
+              <button class="filter-chip" type="button" data-filter="outdoor" aria-pressed="false">Outdoors</button>
+              <button class="filter-chip" type="button" data-filter="home" aria-pressed="false">At home</button>
+              <button class="filter-chip" type="button" data-filter="travel" aria-pressed="false">Travel</button>
+              <button class="filter-chip" type="button" data-filter="family" aria-pressed="false">Family</button>
+            </div>
+
+            <div id="actions-container" class="action-grid">
+              <div class="empty-state">Action cards appear after loading a location.</div>
+            </div>
+          </section>
+        </div>
+
+        <!-- =================================================
+             TAB PANEL 4: ASK AIRWISE & COMMUNITY
+             ================================================= -->
+        <div id="tab-community" class="tab-panel hidden" role="tabpanel" aria-labelledby="tab-btn-community">
+          <section id="assistant" class="panel assistant-section" aria-labelledby="assistant-title">
+            <div class="assistant-header">
+              <div>
+                <h2 id="assistant-title">Ask AirWise</h2>
+                <p class="small muted">Ask about school commutes, indoor steps without a purifier, or cycling trade-offs.</p>
+              </div>
+              <span class="pill pill-accent" id="ai-mode">Checking mode...</span>
+            </div>
+
+            <div class="chat-area">
+              <div id="chat-log" class="chat-log" role="log" aria-live="polite" aria-relevant="additions">
+                <div class="chat-bubble assistant-bubble">Choose a city or ask a question about today's commute, outdoor play, or indoor air.</div>
+              </div>
+
+              <div class="question-starters" role="group" aria-label="Example questions">
+                <button type="button" class="starter-chip" data-question="What should I do about my school commute today?">School commute</button>
+                <button type="button" class="starter-chip" data-question="Which indoor changes can I do for free?">Free indoor fixes</button>
+                <button type="button" class="starter-chip" data-question="Is cycling a good option today?">Cycling today?</button>
+              </div>
+
+              <form id="chat-form" class="chat-form">
+                <label class="sr-only" for="chat-input">Ask AirWise</label>
+                <input id="chat-input" type="text" placeholder="Ask about school, commuting, windows, or fans..." maxlength="550" required>
+                <button type="submit" class="btn btn-primary" id="send-button">
+                  <span>Ask</span>
+                  <svg class="icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/>
+                  </svg>
+                </button>
+              </form>
+
+              <div class="chat-footer-row">
+                <p class="small muted">General guidance, not medical advice. Avoid entering personal or medical details.</p>
+                <button id="clear-chat" class="btn btn-text" type="button">Clear chat</button>
+              </div>
+            </div>
+          </section>
+
+          <section id="community" class="panel community-section" aria-labelledby="community-title">
+            <div class="panel-header-row">
+              <div>
+                <h2 id="community-title">Community brief</h2>
+                <p class="small muted">Shareable guidance for schools, housing groups, and workplaces with no private household data.</p>
+              </div>
+              <button type="button" class="btn btn-secondary" id="download-community" disabled>
+                <svg class="icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                </svg>
+                <span>Download community brief (.txt)</span>
+              </button>
+            </div>
+            <div id="community-cards" class="community-grid">
+              <div class="empty-state">Community guidance appears after loading a city.</div>
+            </div>
+          </section>
+
+          <section class="panel transparency-section" aria-labelledby="transparency-title">
+            <h2 id="transparency-title">Data sources &amp; limits</h2>
+            <div class="transparency-grid">
+              <div class="transparency-box">
+                <h3>Included data</h3>
+                <p>Regional modelled US AQI, six outdoor pollutants, 24-hour forecasts, surface wind dispersion, and your local household profile.</p>
+              </div>
+              <div class="transparency-box">
+                <h3>Not measured</h3>
+                <p>Indoor PM2.5 levels, street-level pollution, personal inhaled dose, medical risk percentages, active GRAP orders, or personal CO₂ savings.</p>
+              </div>
+            </div>
+            <p class="small muted" id="source-disclosure">Live readings use Open-Meteo / Copernicus CAMS regional models reported on the US AQI scale, not official India CPCB station monitors.</p>
+            <div class="evidence-links">
+              <span class="small muted">References:</span>
+              <a href="https://www.airnow.gov/aqi/aqi-basics/" target="_blank" rel="noopener noreferrer">EPA AirNow</a>
+              <a href="https://www.epa.gov/wildfires/how-create-cleaner-air-room-home" target="_blank" rel="noopener noreferrer">EPA Indoor Air</a>
+              <a href="https://open-meteo.com/en/docs/air-quality-api" target="_blank" rel="noopener noreferrer">Open-Meteo API</a>
+              <a href="https://app.cpcbccr.com/ccr_docs/About_AQI.pdf" target="_blank" rel="noopener noreferrer">India CPCB AQI</a>
+              <a href="https://caqm.nic.in/" target="_blank" rel="noopener noreferrer">CAQM Portal</a>
+            </div>
+          </section>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer" role="contentinfo">
+    <div class="container footer-inner">
+      <span>AirWise · Urban Air Quality Assistant</span>
+      <span>Data: <a href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer">Open-Meteo</a> &amp; Copernicus CAMS · Geocoding: GeoNames</span>
+    </div>
+  </footer>
+
+  <!-- =====================================================
+       SLIDE-OVER HOUSEHOLD PROFILE DRAWER
+       ===================================================== -->
+  <div id="profile-backdrop" class="profile-backdrop hidden" aria-hidden="true"></div>
+  <aside id="profile" class="profile-drawer hidden" aria-labelledby="profile-title" aria-hidden="true">
+    <div class="drawer-header">
+      <h2 id="profile-title">Household profile</h2>
+      <button type="button" id="close-profile-btn" class="icon-close-btn" aria-label="Close household profile">
+        <svg class="icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M18 6 6 18"/><path d="m6 6 12 12"/>
+        </svg>
+      </button>
+    </div>
+
+    <div class="drawer-body">
+      <p class="small muted">Changes update your schedule, trade-offs, and indoor plan immediately. Stored only in this browser.</p>
+
+      <div class="drawer-group">
+        <span class="field-label">Quick presets</span>
+        <div class="preset-grid" role="group" aria-label="Household presets">
+          <button class="preset-chip" type="button" data-persona="family">Family</button>
+          <button class="preset-chip" type="button" data-persona="cyclist">Cyclist</button>
+          <button class="preset-chip" type="button" data-persona="fixed">Fixed shift</button>
+          <button class="preset-chip" type="button" data-persona="budget">Budget-first</button>
+        </div>
+      </div>
+
+      <div class="drawer-group">
+        <span class="field-label">Sensitivity</span>
+        <label class="checkbox-field"><input type="checkbox" id="children"><span>Children at home</span></label>
+        <label class="checkbox-field"><input type="checkbox" id="extra-care"><span>Need extra precautions</span></label>
+      </div>
+
+      <div class="drawer-group">
+        <label for="commute" class="field-label">Usual commute</label>
+        <select id="commute">
+          <option value="transit">Public transport</option>
+          <option value="scooter">Scooter / motorbike</option>
+          <option value="car">Car</option>
+          <option value="walk">Walking</option>
+          <option value="cycle">Cycling</option>
+          <option value="remote">Work / study from home</option>
+        </select>
+
+        <label for="budget" class="field-label">Indoor budget</label>
+        <select id="budget">
+          <option value="free">Free steps only</option>
+          <option value="low">Low-cost solutions</option>
+          <option value="flexible">Flexible budget</option>
+        </select>
+
+        <label for="home" class="field-label">Home air equipment</label>
+        <select id="home">
+          <option value="none">No purifier</option>
+          <option value="fan">Only a fan</option>
+          <option value="purifier">Own a particle purifier</option>
+        </select>
+      </div>
+
+      <div class="drawer-group">
+        <label for="usual-hour" class="field-label">Usual departure time</label>
+        <select id="usual-hour">
+          <option value="7">7:00 AM</option><option value="8" selected>8:00 AM</option><option value="9">9:00 AM</option>
+          <option value="10">10:00 AM</option><option value="11">11:00 AM</option><option value="12">12:00 PM</option>
+          <option value="13">1:00 PM</option><option value="14">2:00 PM</option><option value="15">3:00 PM</option>
+          <option value="16">4:00 PM</option><option value="17">5:00 PM</option><option value="18">6:00 PM</option>
+          <option value="19">7:00 PM</option>
+        </select>
+
+        <label for="flexibility" class="field-label">Schedule flexibility</label>
+        <select id="flexibility">
+          <option value="limited">Limited (up to 15 min)</option>
+          <option value="flexible">Flexible (up to 2 hours)</option>
+          <option value="fixed">Fixed (cannot move)</option>
+        </select>
+
+        <label for="max-shift" class="field-label">Max schedule shift</label>
+        <select id="max-shift">
+          <option value="">Use flexibility above</option>
+          <option value="0">0 min</option><option value="15">15 min</option><option value="30">30 min</option>
+          <option value="60">60 min</option><option value="120">120 min</option>
+        </select>
+
+        <label for="outdoor-hour" class="field-label">Outdoor play / exercise hour</label>
+        <select id="outdoor-hour">
+          <option value="7">7 AM</option><option value="8">8 AM</option><option value="9">9 AM</option>
+          <option value="10">10 AM</option><option value="11">11 AM</option><option value="12">12 PM</option>
+          <option value="13">1 PM</option><option value="14">2 PM</option><option value="15">3 PM</option>
+          <option value="16" selected>4 PM</option><option value="17">5 PM</option><option value="18">6 PM</option>
+          <option value="19">7 PM</option>
+        </select>
+
+        <label for="cooking-hour" class="field-label">Typical cooking time</label>
+        <select id="cooking-hour">
+          <option value="6">6 AM</option><option value="7">7 AM</option><option value="8">8 AM</option>
+          <option value="9">9 AM</option><option value="12">12 PM</option><option value="13">1 PM</option>
+          <option value="17">5 PM</option><option value="18">6 PM</option><option value="19" selected>7 PM</option>
+          <option value="20">8 PM</option><option value="21">9 PM</option><option value="22">10 PM</option>
+        </select>
+      </div>
+
+      <div class="drawer-privacy">
+        <p class="small muted">No account needed. Preferences stay on this device.</p>
+        <button type="button" class="btn btn-danger-ghost" id="clear-local">Reset preferences &amp; city</button>
+      </div>
+    </div>
+  </aside>
+</body>
+</html>
