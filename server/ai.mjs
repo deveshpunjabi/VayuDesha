@@ -168,10 +168,10 @@ async function requestOpenAiSelection(prompt, fetcher) {
   return text;
 }
 
-async function callGeminiModel(model, key, prompt, fetcher) {
+async function callGeminiModel(model, key, prompt, fetcher, timeoutMs = 8000) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
   const response = await fetcher(url, {
-    method: 'POST', signal: AbortSignal.timeout(14000),
+    method: 'POST', signal: AbortSignal.timeout(timeoutMs),
     headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: prompt.instructions }] },
@@ -211,10 +211,10 @@ async function requestGeminiSelection(prompt, fetcher) {
   const primary = String(process.env.GEMINI_MODEL || 'gemini-4-hydrogen').trim() || 'gemini-4-hydrogen';
   const fallback = String(process.env.GEMINI_FALLBACK_MODEL || 'gemini-2.5-flash').trim();
   try {
-    return { text: await callGeminiModel(primary, key, prompt, fetcher), modelUsed: primary };
+    return { text: await callGeminiModel(primary, key, prompt, fetcher, 4500), modelUsed: primary };
   } catch (error) {
-    if ((error?.status === 503 || error?.status === 429) && fallback && fallback !== primary) {
-      return { text: await callGeminiModel(fallback, key, prompt, fetcher), modelUsed: fallback };
+    if (fallback && fallback !== primary) {
+      return { text: await callGeminiModel(fallback, key, prompt, fetcher, 7500), modelUsed: fallback };
     }
     throw error;
   }
