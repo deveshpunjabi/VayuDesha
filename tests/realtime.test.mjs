@@ -427,8 +427,9 @@ test('Concurrent getAir calls for the same city deduplicate upstream provider re
   });
 });
 
-test('OpenAQ v3 ground-station adapter sends X-API-Key header and returns observed station readings', async () => {
+test('OpenAQ v3 ground-station adapter sends X-API-Key header, skips stale 2018 stations/sensors, and returns live observed station readings', async () => {
   await withEnv({ OPENAQ_API_KEY: 'mock-openaq-key', WAQI_API_TOKEN: undefined }, async () => {
+    const freshIso = new Date().toISOString();
     const mockFetcher = async (url, options) => {
       assert.equal(options.headers['X-API-Key'], 'mock-openaq-key');
       assert.doesNotMatch(url, /mock-openaq-key/);
@@ -436,12 +437,27 @@ test('OpenAQ v3 ground-station adapter sends X-API-Key header and returns observ
         return {
           ok: true,
           json: async () => ({
-            results: [{
-              id: 8118,
-              name: 'New Delhi US Diplomatic Post',
-              provider: { name: 'AirNow' },
-              sensors: [{ id: 23534, parameter: { name: 'pm25', units: 'µg/m³' } }]
-            }]
+            results: [
+              {
+                id: 13,
+                name: 'Archived 2018 Station',
+                provider: { name: 'CPCB' },
+                datetimeLast: { utc: '2018-02-22T04:00:00Z' },
+                sensors: [{ id: 100, parameter: { name: 'pm25', units: 'µg/m³' } }]
+              },
+              {
+                id: 8118,
+                name: 'New Delhi US Diplomatic Post',
+                provider: { name: 'AirNow' },
+                isMonitor: true,
+                distance: 1500,
+                datetimeLast: { utc: freshIso },
+                sensors: [
+                  { id: 23534, parameter: { name: 'pm25', units: 'µg/m³' } },
+                  { id: 99999, parameter: { name: 'pm25', units: 'µg/m³' } }
+                ]
+              }
+            ]
           })
         };
       }
@@ -449,7 +465,10 @@ test('OpenAQ v3 ground-station adapter sends X-API-Key header and returns observ
         return {
           ok: true,
           json: async () => ({
-            results: [{ sensorsId: 23534, value: 142.6, datetime: { utc: '2026-11-19T15:00:00Z' } }]
+            results: [
+              { sensorsId: 23534, value: 142.6, datetime: { utc: freshIso } },
+              { sensorsId: 99999, value: 451.0, datetime: { utc: '2018-02-22T04:00:00Z' } }
+            ]
           })
         };
       }

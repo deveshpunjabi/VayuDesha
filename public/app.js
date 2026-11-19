@@ -658,17 +658,29 @@ function renderObservedStation(obs) {
   }
   card.classList.remove('hidden');
   el('observed-station-name').textContent = obs.stationName || 'Ground monitoring station';
-  el('observed-station-aqi').textContent = Number.isFinite(obs.aqi)
-    ? displayNumber(obs.aqi)
-    : `${displayNumber(obs.primaryValue, 1)} ${obs.primaryUnit || 'µg/m³'}`;
+  const unitEl = el('observed-station-unit');
+  if (Number.isFinite(obs.aqi)) {
+    el('observed-station-aqi').textContent = displayNumber(obs.aqi);
+    unitEl.textContent = 'US AQI';
+  } else {
+    el('observed-station-aqi').textContent = displayNumber(obs.primaryValue, 1);
+    const pol = (obs.dominantPollutant || 'PM25').toUpperCase();
+    unitEl.textContent = `${pol} (${obs.primaryUnit || 'µg/m³'})`;
+  }
   const meta = el('observed-station-meta');
   meta.replaceChildren();
+  const readingSummary = obs.readings
+    ? ['pm25', 'pm10', 'no2', 'o3', 'so2', 'co']
+        .filter(k => Number.isFinite(obs.readings[k]?.value))
+        .map(k => `${k.toUpperCase()} ${obs.readings[k].value} ${obs.readings[k].unit || 'µg/m³'}`)
+        .join(' · ')
+    : null;
   const parts = [
     obs.source || 'Observed ground station',
-    obs.dominantPollutant ? `Pollutant: ${obs.dominantPollutant.toUpperCase()}` : null,
+    readingSummary || (obs.dominantPollutant ? `Pollutant: ${obs.dominantPollutant.toUpperCase()}` : null),
     obs.time ? `Reported: ${labelTime(obs.time, { day: 'numeric', month: 'short' })}` : null
   ].filter(Boolean);
-  meta.append(document.createTextNode(`${parts.join(' · ')} — independent ground-monitor comparison alongside regional CAMS model.`));
+  meta.append(document.createTextNode(`${parts.join(' · ')} — live physical ground-monitor telemetry alongside regional CAMS model.`));
   if (typeof obs.url === 'string' && /^https?:\/\//i.test(obs.url)) {
     meta.append(document.createTextNode(' '));
     const link = document.createElement('a');

@@ -149,50 +149,76 @@ export async function getOpenAqStation(lat, lon, fetcher = fetch) {
   if (!apiKey) return null;
   try {
     const headers = { accept: 'application/json', 'X-API-Key': apiKey };
-    const locUrl = `${OPENAQ_URL}/locations?coordinates=${lat},${lon}&radius=25000&limit=5`;
+    const locUrl = `${OPENAQ_URL}/locations?coordinates=${lat},${lon}&radius=25000&limit=50`;
     const locRes = await fetcher(locUrl, { signal: AbortSignal.timeout(6500), headers });
     if (!locRes?.ok) return null;
     const locData = await locRes.json().catch(() => null);
     const results = Array.isArray(locData?.results) ? locData.results : [];
-    const station = results.find(item => Number.isFinite(item?.id) && Array.isArray(item.sensors) && item.sensors.length > 0);
-    if (!station) return null;
+    const cutoffMs = Date.now() - 48 * 3600_000;
+    const candidates = results
+      .filter(item => {
+        if (!Number.isFinite(item?.id) || !Array.isArray(item.sensors) || !item.sensors.length) return false;
+        const lastUtc = item.datetimeLast?.utc;
+        if (lastUtc && Number.isFinite(Date.parse(lastUtc)) && Date.parse(lastUtc) < cutoffMs) return false;
+        return true;
+      })
+      .sort((a, b) => {
+        const aHasPm = a.sensors.some(s => /^pm(25|10)$/i.test(String(s.parameter?.name || ''))) ? 1 : 0;
+        const bHasPm = b.sensors.some(s => /^pm(25|10)$/i.test(String(s.parameter?.name || ''))) ? 1 : 0;
+        if (aHasPm !== bHasPm) return bHasPm - aHasPm;
+        const aRef = (a.isMonitor || /CPCB|AirNow|EPA|DEFRA/i.test(String(a.provider?.name || ''))) ? 1 : 0;
+        const bRef = (b.isMonitor || /CPCB|AirNow|EPA|DEFRA/i.test(String(b.provider?.name || ''))) ? 1 : 0;
+        if (aRef !== bRef) return bRef - aRef;
+        const aDist = Number.isFinite(a.distance) ? a.distance : 999999;
+        const bDist = Number.isFinite(b.distance) ? b.distance : 999999;
+        if (Math.abs(aDist - bDist) > 500) return aDist - bDist;
+        return (Date.parse(b.datetimeLast?.utc || '') || 0) - (Date.parse(a.datetimeLast?.utc || '') || 0);
+      });
 
-    const latestUrl = `${OPENAQ_URL}/locations/${encodeURIComponent(String(station.id))}/latest`;
-    const latestRes = await fetcher(latestUrl, { signal: AbortSignal.timeout(6500), headers });
-    if (!latestRes?.ok) return null;
-    const latestData = await latestRes.json().catch(() => null);
-    const measurements = Array.isArray(latestData?.results) ? latestData.results : [];
-    if (!measurements.length) return null;
+    for (const station of candidates.slice(0, 3)) {
+      const latestUrl = `${OPENAQ_URL}/locations/${encodeURIComponent(String(station.id))}/latest`;
+      const latestRes = await fetcher(latestUrl, { signal: AbortSignal.timeout(6500), headers });
+      if (!latestRes?.ok) continue;
+      const latestData = await latestRes.json().catch(() => null);
+      const measurements = Array.isArray(latestData?.results) ? latestData.results : [];
+      if (!measurements.length) continue;
 
-    const sensorMap = new Map(station.sensors.map(s => [s.id, s.parameter]));
-    const readings = {};
-    let latestTime = null;
-    for (const m of measurements) {
-      const param = sensorMap.get(m.sensorsId);
-      const val = numberOrNull(m.value);
-      if (!param?.name || val === null) continue;
-      const key = String(param.name).toLowerCase();
-      readings[key] = { value: Math.round(val * 10) / 10, unit: String(param.units || 'µg/m³') };
-      const dt = m.datetime?.utc || m.datetime?.local || null;
-      if (dt && (!latestTime || Date.parse(dt) > Date.parse(latestTime))) latestTime = dt;
+      const sensorMap = new Map(station.sensors.map(s => [s.id, s.parameter]));
+      const readings = {};
+      let latestTime = null;
+      for (const m of measurements) {
+        const param = sensorMap.get(m.sensorsId);
+        const val = numberOrNull(m.value);
+        if (!param?.name || val === null || val < 0) continue;
+        const dt = m.datetime?.utc || m.datetime?.local || null;
+        const dtMs = dt ? Date.parse(dt) : NaN;
+        if (Number.isFinite(dtMs) && dtMs < cutoffMs) continue;
+        const key = String(param.name).toLowerCase();
+        const prevMs = readings[key]?.time ? Date.parse(readings[key].time) : -Infinity;
+        if (!readings[key] || (Number.isFinite(dtMs) && dtMs >= prevMs)) {
+          readings[key] = { value: Math.round(val * 10) / 10, unit: String(param.units || 'µg/m³'), time: dt };
+        }
+        if (dt && (!latestTime || Date.parse(dt) > Date.parse(latestTime))) latestTime = dt;
+      }
+      const primaryKey = ['pm25', 'pm10', 'no2', 'o3', 'so2', 'co'].find(k => readings[k]) || Object.keys(readings)[0];
+      if (!primaryKey) continue;
+
+      const providerName = station.provider?.name ? String(station.provider.name).slice(0, 60) : 'OpenAQ Network';
+      return {
+        stationName: String(station.name || station.locality || 'OpenAQ Ground Station').slice(0, 140),
+        provider: providerName,
+        aqi: null,
+        primaryValue: readings[primaryKey].value,
+        primaryUnit: readings[primaryKey].unit,
+        dominantPollutant: primaryKey,
+        readings,
+        time: readings[primaryKey].time || latestTime,
+        source: `OpenAQ v3 (${providerName})`,
+        sourceType: 'observed',
+        url: `https://explore.openaq.org/locations/${station.id}`
+      };
     }
-    const primaryKey = ['pm25', 'pm10', 'no2', 'o3', 'so2', 'co'].find(k => readings[k]) || Object.keys(readings)[0];
-    if (!primaryKey) return null;
-
-    const providerName = station.provider?.name ? String(station.provider.name).slice(0, 60) : 'OpenAQ Network';
-    return {
-      stationName: String(station.name || station.locality || 'OpenAQ Ground Station').slice(0, 140),
-      provider: providerName,
-      aqi: null,
-      primaryValue: readings[primaryKey].value,
-      primaryUnit: readings[primaryKey].unit,
-      dominantPollutant: primaryKey,
-      readings,
-      time: latestTime,
-      source: `OpenAQ v3 (${providerName})`,
-      sourceType: 'observed',
-      url: `https://explore.openaq.org/locations/${station.id}`
-    };
+    return null;
   } catch {
     return null;
   }
