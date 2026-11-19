@@ -1,15 +1,34 @@
+# Environment & secrets (never commit real API keys)
 .env
 .env.*
 !.env.example
+*.pem
+*.key
+
+# Dependencies & build/test outputs
 node_modules/
-.DS_Store
+dist/
+build/
 coverage/
+.nyc_output/
+
+# Logs & temporary files
 *.log
+npm-debug.log*
+*.tmp
+*.swp
+*.swo
+
+# OS & editor clutter
+.DS_Store
+Thumbs.db
+Desktop.ini
 .vscode/
 .idea/
-dist/
-preview-*.png
+
+# Archives & large local screenshots/recordings
 *.zip
+preview-*.png
 *.webp
 *.mp4
 *.mov

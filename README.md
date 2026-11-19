@@ -39,8 +39,8 @@ Rather than building another passive AQI number dashboard or an unconstrained ch
 
 ```bash
 node --version        # Node >= 20.10.0 (tested on Node 22 / 26)
-npm test              # 93 built-in node:test cases (0 external packages)
-npm run check:size    # ~0.51 MiB source (well under 10 MB limit)
+npm test              # 94 built-in node:test cases (0 external packages)
+npm run check:size    # ~0.50 MiB source (well under 10 MB limit)
 npm start             # Opens at http://localhost:3000 (dual-stack IPv4 + IPv6)
 ```
 
@@ -99,7 +99,7 @@ Server Modules: index.mjs · air.mjs · decisions.mjs · routine.mjs · room.mjs
 | **Code Quality** | Clean, modular ES2022 `.mjs` architecture (`server/` + `public/`), pure deterministic logic separated from HTTP/UI, zero runtime npm dependencies, zero dead code. |
 | **Security** | Strict CSP (`default-src 'self'`), `X-Frame-Options: DENY`, `Cross-Origin-Opener-Policy: same-origin`, `X-Permitted-Cross-Domain-Policies: none`, proxy HSTS, `Referrer-Policy: no-referrer`, same-origin `POST` enforcement, 12 KB JSON body cap, `Content-Type` validation, zero `innerHTML` sinks, server-only API keys (`x-goog-api-key` header, never query strings), per-IP rate & SSE stream limits (4/IP, 20 global, 30m max lifetime), 15 automated red-team prompt-injection & safety tests. |
 | **Efficiency** | **0.512 MiB** total source (~5% of 10 MB cap), zero build step, zero external font/CDN bloat, TTL response caching (10m pulse / 20m air / 24h geocoding) with in-flight request deduplication (thundering-herd protection), capped SSE streams with clean disconnect teardown, and graceful `SIGINT`/`SIGTERM` shutdown. |
-| **Testing** | **93/93 automated tests passing** via native `node:test` (`tests/air.test.mjs`, `ai.test.mjs`, `choices.test.mjs`, `compare.test.mjs`, `decisions.test.mjs`, `redteam.test.mjs`, `realtime.test.mjs`, `server.test.mjs`, `ui-integrity.test.mjs`, `v4.test.mjs`) + CI workflow (`.github/workflows/ci.yml`). |
+| **Testing** | **94/94 automated tests passing** via native `node:test` (`tests/air.test.mjs`, `ai.test.mjs`, `choices.test.mjs`, `compare.test.mjs`, `decisions.test.mjs`, `redteam.test.mjs`, `realtime.test.mjs`, `server.test.mjs`, `ui-integrity.test.mjs`, `v4.test.mjs`) + automated static secret/CSP checks + CI workflow (`.github/workflows/ci.yml`). |
 | **Accessibility** | Semantic HTML5 landmarks, skip link, keyboard-navigable `tablist` & slide-over drawer (`Escape` + focus return), `aria-live` status updates, WCAG 2.2 AA contrast targets, >= 44px mobile touch targets, `prefers-reduced-motion`, accessible SVG chart summary, print stylesheet. Verified with **0 console errors** and **0 px mobile horizontal overflow** at `390×844` and `1440×900`. |
 | **Problem Statement Alignment** | Directly solves Challenge 6 end-to-end: real-time smog intelligence, tailored low-emission daily routines, practical indoor hacks (CADR + fan vs. purifier + source control), community playbook, and transparent impact explanations. |
 
@@ -107,12 +107,13 @@ Server Modules: index.mjs · air.mjs · decisions.mjs · routine.mjs · room.mjs
 
 ## Verification Status (19 November 2026)
 
-- **Automated Tests:** `npm test` — **93 passed, 0 failed**.
-- **Repository Source Size:** `npm run check:size` — **0.512 MiB** (source-only; verify full size including `.git` history stays `< 10 MB` after pushing).
+- **Automated Tests:** `npm test` — **94 passed, 0 failed**.
+- **Repository Size:** `npm run check:size` — **~0.50 MiB** source-only (~0.7 MiB including `.git` history on single branch `main`, well under the 10 MB limit).
 - **Live External Provider Proof:**
   - **Open-Meteo Air Quality (CAMS), Weather & Geocoding:** **REAL** — verified live HTTP 200 responses across `/api/pulse`, `/api/cities`, `/api/plan`, and `/api/stream` (SSE).
-  - **Live Browser QA (`1440×900` desktop & `390×844` mobile):** **VERIFIED** locally on `http://localhost:3006` with 0 console errors, 0 failed requests, and 0 px horizontal overflow.
-  - **Google Gemini, OpenAI, and WAQI adapters:** **MOCKED** in automated tests (not yet tested with live credentials).
+  - **Google Gemini (`gemini-2.5-flash` structured JSON router):** **REAL** — verified live authenticated HTTP 200 calls via server-side `.env` (strictly gitignored, header-only `x-goog-api-key`, `thinkingBudget: 0`), confirming valid allowlisted action-ID routing and prompt-injection resistance.
+  - **Live Browser QA (`1440×900` desktop & `390×844` mobile):** **VERIFIED** locally with 0 console errors, 0 failed requests, and 0 px horizontal overflow.
+  - **OpenAI and WAQI adapters:** **MOCKED** in automated tests.
 - **Full Documentation Suite:** See `PROJECT_STATUS.md` and `docs/01`–`docs/12` + `docs/TASK_BACKLOG.csv`.
 
 License: MIT. See `LICENSE`.

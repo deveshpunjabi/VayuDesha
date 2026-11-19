@@ -173,7 +173,9 @@ async function requestGeminiSelection(prompt, fetcher) {
       contents: [{ role: 'user', parts: [{ text: prompt.input }] }],
       generationConfig: {
         responseMimeType: 'application/json',
-        maxOutputTokens: 210,
+        temperature: 0,
+        maxOutputTokens: 256,
+        thinkingConfig: { thinkingBudget: 0 },
         responseSchema: {
           type: 'OBJECT',
           properties: {

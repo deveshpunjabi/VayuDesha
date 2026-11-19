@@ -20,3 +20,20 @@ test('Honest simulation and model labelling persists in the UI', async () => {
   assert.match(app, /GENAI-SELECTED · EVIDENCE-LOCKED/);
   assert.match(html, /scenario-proof-title/);
 });
+
+test('Frontend and server source contain zero unsafe DOM sinks or hardcoded API keys', async () => {
+  const files = [
+    '../public/app.js',
+    '../public/index.html',
+    '../server/ai.mjs',
+    '../server/air.mjs',
+    '../server/index.mjs'
+  ];
+  for (const rel of files) {
+    const src = await readFile(new URL(rel, import.meta.url), 'utf8');
+    assert.doesNotMatch(src, /\binnerHTML\b|\bouterHTML\b|\binsertAdjacentHTML\b|\bdocument\.write\b/, `Unsafe DOM sink in ${rel}`);
+    assert.doesNotMatch(src, /\b(?:AIza[0-9A-Za-z_-]{20,}|sk-[A-Za-z0-9_-]{20,}|AQ\.[A-Za-z0-9_-]{20,})\b/, `Hardcoded API key detected in ${rel}`);
+  }
+  const html = await readFile(new URL('../public/index.html', import.meta.url), 'utf8');
+  assert.doesNotMatch(html, /\son[a-z]+\s*=/i, 'Inline event handlers violate strict CSP');
+});
