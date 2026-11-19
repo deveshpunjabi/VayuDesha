@@ -92,6 +92,7 @@ export async function requestHandler(req, res) {
           ok: true,
           aiEnabled: Boolean(aiProvider),
           aiProvider,
+          openaqEnabled: Boolean(String(process.env.OPENAQ_API_KEY || '').trim()),
           waqiEnabled: Boolean(String(process.env.WAQI_API_TOKEN || '').trim())
         });
       }

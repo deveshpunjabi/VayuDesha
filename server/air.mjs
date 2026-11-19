@@ -6,6 +6,7 @@ import { categoryForUsAqi } from './decisions.mjs';
 const AIR_URL = 'https://air-quality-api.open-meteo.com/v1/air-quality';
 const WEATHER_URL = 'https://api.open-meteo.com/v1/forecast';
 const GEO_URL = 'https://geocoding-api.open-meteo.com/v1/search';
+const OPENAQ_URL = 'https://api.openaq.org/v3';
 const WAQI_URL = 'https://api.waqi.info/feed/geo:';
 const cache = new Map();
 const inFlight = new Map();
@@ -143,7 +144,63 @@ async function fetchWeather(lat, lon, fetcher = fetch) {
     return null;
   }
 }
+export async function getOpenAqStation(lat, lon, fetcher = fetch) {
+  const apiKey = String(process.env.OPENAQ_API_KEY || '').trim();
+  if (!apiKey) return null;
+  try {
+    const headers = { accept: 'application/json', 'X-API-Key': apiKey };
+    const locUrl = `${OPENAQ_URL}/locations?coordinates=${lat},${lon}&radius=25000&limit=5`;
+    const locRes = await fetcher(locUrl, { signal: AbortSignal.timeout(6500), headers });
+    if (!locRes?.ok) return null;
+    const locData = await locRes.json().catch(() => null);
+    const results = Array.isArray(locData?.results) ? locData.results : [];
+    const station = results.find(item => Number.isFinite(item?.id) && Array.isArray(item.sensors) && item.sensors.length > 0);
+    if (!station) return null;
+
+    const latestUrl = `${OPENAQ_URL}/locations/${encodeURIComponent(String(station.id))}/latest`;
+    const latestRes = await fetcher(latestUrl, { signal: AbortSignal.timeout(6500), headers });
+    if (!latestRes?.ok) return null;
+    const latestData = await latestRes.json().catch(() => null);
+    const measurements = Array.isArray(latestData?.results) ? latestData.results : [];
+    if (!measurements.length) return null;
+
+    const sensorMap = new Map(station.sensors.map(s => [s.id, s.parameter]));
+    const readings = {};
+    let latestTime = null;
+    for (const m of measurements) {
+      const param = sensorMap.get(m.sensorsId);
+      const val = numberOrNull(m.value);
+      if (!param?.name || val === null) continue;
+      const key = String(param.name).toLowerCase();
+      readings[key] = { value: Math.round(val * 10) / 10, unit: String(param.units || 'µg/m³') };
+      const dt = m.datetime?.utc || m.datetime?.local || null;
+      if (dt && (!latestTime || Date.parse(dt) > Date.parse(latestTime))) latestTime = dt;
+    }
+    const primaryKey = ['pm25', 'pm10', 'no2', 'o3', 'so2', 'co'].find(k => readings[k]) || Object.keys(readings)[0];
+    if (!primaryKey) return null;
+
+    const providerName = station.provider?.name ? String(station.provider.name).slice(0, 60) : 'OpenAQ Network';
+    return {
+      stationName: String(station.name || station.locality || 'OpenAQ Ground Station').slice(0, 140),
+      provider: providerName,
+      aqi: null,
+      primaryValue: readings[primaryKey].value,
+      primaryUnit: readings[primaryKey].unit,
+      dominantPollutant: primaryKey,
+      readings,
+      time: latestTime,
+      source: `OpenAQ v3 (${providerName})`,
+      sourceType: 'observed',
+      url: `https://explore.openaq.org/locations/${station.id}`
+    };
+  } catch {
+    return null;
+  }
+}
+
 export async function getObservedStation(lat, lon, fetcher = fetch) {
+  const openAq = await getOpenAqStation(lat, lon, fetcher);
+  if (openAq) return openAq;
   const token = String(process.env.WAQI_API_TOKEN || '').trim();
   if (!token) return null;
   try {
@@ -222,8 +279,10 @@ export async function getAir(rawLat, rawLon, fetcher = fetch) {
   // City-level precision only: no household GPS coordinates required.
   const lat = Math.round(coords.lat * 100) / 100;
   const lon = Math.round(coords.lon * 100) / 100;
+  const hasOpenAq = Boolean(String(process.env.OPENAQ_API_KEY || '').trim());
   const hasWaqi = Boolean(String(process.env.WAQI_API_TOKEN || '').trim());
-  return cachedFor(fetcher, `air:${lat}:${lon}:${hasWaqi ? 'waqi' : 'model'}`, 20 * 60_000, async () => {
+  const obsTag = hasOpenAq ? 'openaq' : hasWaqi ? 'waqi' : 'model';
+  return cachedFor(fetcher, `air:${lat}:${lon}:${obsTag}`, 20 * 60_000, async () => {
     const url = new URL(AIR_URL);
     url.searchParams.set('latitude', String(lat));
     url.searchParams.set('longitude', String(lon));

@@ -6,6 +6,7 @@ import {
   normalizeWeather,
   dispersionNoteForWind,
   getAir,
+  getOpenAqStation,
   getObservedStation,
   getLiveCityPulse,
   getSimulatedAir,
@@ -342,22 +343,23 @@ test('HTTP /api/health reports aiProvider and waqiEnabled without leaking secret
   const base = `http://127.0.0.1:${server.address().port}`;
 
   // /api/health without keys
-  await withEnv({ GEMINI_API_KEY: undefined, OPENAI_API_KEY: undefined, WAQI_API_TOKEN: undefined, AI_PROVIDER: undefined }, async () => {
+  await withEnv({ GEMINI_API_KEY: undefined, OPENAI_API_KEY: undefined, OPENAQ_API_KEY: undefined, WAQI_API_TOKEN: undefined, AI_PROVIDER: undefined }, async () => {
     const res = await fetch(`${base}/api/health`);
     assert.equal(res.status, 200);
     const body = await res.json();
-    assert.deepEqual(body, { ok: true, aiEnabled: false, aiProvider: null, waqiEnabled: false });
+    assert.deepEqual(body, { ok: true, aiEnabled: false, aiProvider: null, openaqEnabled: false, waqiEnabled: false });
   });
 
   // /api/health with mocked keys must NEVER leak raw secrets
-  await withEnv({ GEMINI_API_KEY: 'super-secret-gemini-xyz', WAQI_API_TOKEN: 'super-secret-waqi-xyz', OPENAI_API_KEY: undefined, AI_PROVIDER: undefined }, async () => {
+  await withEnv({ GEMINI_API_KEY: 'super-secret-gemini-xyz', OPENAQ_API_KEY: 'super-secret-openaq-xyz', WAQI_API_TOKEN: 'super-secret-waqi-xyz', OPENAI_API_KEY: undefined, AI_PROVIDER: undefined }, async () => {
     const res = await fetch(`${base}/api/health`);
     assert.equal(res.status, 200);
     const text = await res.text();
     assert.doesNotMatch(text, /super-secret-gemini-xyz/);
+    assert.doesNotMatch(text, /super-secret-openaq-xyz/);
     assert.doesNotMatch(text, /super-secret-waqi-xyz/);
     const body = JSON.parse(text);
-    assert.deepEqual(body, { ok: true, aiEnabled: true, aiProvider: 'gemini', waqiEnabled: true });
+    assert.deepEqual(body, { ok: true, aiEnabled: true, aiProvider: 'gemini', openaqEnabled: true, waqiEnabled: true });
   });
 
   // /api/stream rejects invalid coordinates with 400
@@ -422,5 +424,44 @@ test('Concurrent getAir calls for the same city deduplicate upstream provider re
     assert.equal(a.current.aqi, 140);
     assert.equal(b.current.aqi, 140);
     assert.equal(c.current.aqi, 140);
+  });
+});
+
+test('OpenAQ v3 ground-station adapter sends X-API-Key header and returns observed station readings', async () => {
+  await withEnv({ OPENAQ_API_KEY: 'mock-openaq-key', WAQI_API_TOKEN: undefined }, async () => {
+    const mockFetcher = async (url, options) => {
+      assert.equal(options.headers['X-API-Key'], 'mock-openaq-key');
+      assert.doesNotMatch(url, /mock-openaq-key/);
+      if (url.includes('/v3/locations?coordinates=28.61,77.21')) {
+        return {
+          ok: true,
+          json: async () => ({
+            results: [{
+              id: 8118,
+              name: 'New Delhi US Diplomatic Post',
+              provider: { name: 'AirNow' },
+              sensors: [{ id: 23534, parameter: { name: 'pm25', units: 'µg/m³' } }]
+            }]
+          })
+        };
+      }
+      if (url.includes('/v3/locations/8118/latest')) {
+        return {
+          ok: true,
+          json: async () => ({
+            results: [{ sensorsId: 23534, value: 142.6, datetime: { utc: '2026-11-19T15:00:00Z' } }]
+          })
+        };
+      }
+      throw new Error(`Unexpected URL: ${url}`);
+    };
+    const obs = await getOpenAqStation(28.61, 77.21, mockFetcher);
+    assert.ok(obs);
+    assert.equal(obs.sourceType, 'observed');
+    assert.equal(obs.stationName, 'New Delhi US Diplomatic Post');
+    assert.equal(obs.primaryValue, 142.6);
+    assert.equal(obs.primaryUnit, 'µg/m³');
+    assert.equal(obs.dominantPollutant, 'pm25');
+    assert.equal(obs.url, 'https://explore.openaq.org/locations/8118');
   });
 });

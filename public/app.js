@@ -641,21 +641,24 @@ function categoryText(level) {
 
 function renderObservedStation(obs) {
   const card = el('observed-station-card');
-  if (!obs || !Number.isFinite(obs.aqi)) {
+  const hasValue = obs && (Number.isFinite(obs.aqi) || Number.isFinite(obs.primaryValue));
+  if (!hasValue) {
     card.classList.add('hidden');
     return;
   }
   card.classList.remove('hidden');
   el('observed-station-name').textContent = obs.stationName || 'Ground monitoring station';
-  el('observed-station-aqi').textContent = displayNumber(obs.aqi);
+  el('observed-station-aqi').textContent = Number.isFinite(obs.aqi)
+    ? displayNumber(obs.aqi)
+    : `${displayNumber(obs.primaryValue, 1)} ${obs.primaryUnit || 'µg/m³'}`;
   const meta = el('observed-station-meta');
   meta.replaceChildren();
   const parts = [
     obs.source || 'Observed ground station',
-    obs.dominantPollutant ? `Dominant: ${obs.dominantPollutant.toUpperCase()}` : null,
+    obs.dominantPollutant ? `Pollutant: ${obs.dominantPollutant.toUpperCase()}` : null,
     obs.time ? `Reported: ${labelTime(obs.time, { day: 'numeric', month: 'short' })}` : null
   ].filter(Boolean);
-  meta.append(document.createTextNode(`${parts.join(' · ')} — independent observed comparison alongside CAMS model.`));
+  meta.append(document.createTextNode(`${parts.join(' · ')} — independent ground-monitor comparison alongside regional CAMS model.`));
   if (typeof obs.url === 'string' && /^https?:\/\//i.test(obs.url)) {
     meta.append(document.createTextNode(' '));
     const link = document.createElement('a');

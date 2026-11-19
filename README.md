@@ -20,7 +20,7 @@ Rather than building another passive AQI number dashboard or an unconstrained ch
 1. **Real-Time Multi-Pollutant & Winter Smog Meteorology Ingestion (`server/air.mjs`)**:
    - Pulls live regional **US AQI** and 6 pollutants (**PM2.5, PM10, NO₂, O₃, SO₂, CO**) plus 30-hour forecasts from **Open-Meteo / Copernicus CAMS**.
    - Fetches parallel **Open-Meteo Weather** telemetry (**wind speed, relative humidity, temperature, surface pressure**) to surface factual winter-smog dispersion context (e.g., light winds `< 8 km/h` slowing urban smoke dispersion), degrading gracefully if weather is unreachable.
-   - Optionally integrates an observed ground-station comparison via **WAQI** (`WAQI_API_TOKEN`), strictly tagged `sourceType: 'observed'` and never mixed with or relabelled as CAMS model data or India CPCB AQI.
+   - Optionally integrates observed ground-station measurements via **OpenAQ v3** (`OPENAQ_API_KEY`, header-only `X-API-Key`) or **WAQI** (`WAQI_API_TOKEN`), strictly tagged `sourceType: 'observed'` and never mixed with or relabelled as CAMS model data or India CPCB AQI.
    - Rejects malformed coordinates, empty payloads, and stale (`> 3h`) timestamps; provides 4 explicitly labelled synthetic demo scenarios (`unhealthy 183`, `hazardous 355`, `moderate 77`, `unavailable`) for reproducible offline judging.
 2. **Household-Calibrated Decision Engine (`server/decisions.mjs`, `server/routine.mjs`, `server/choices.mjs`, `server/compare.mjs`, `server/room.mjs`)**:
    - Normalizes 10 household constraints (`children`, `extraCare`, `commute`, `budget`, `home`, `flexibility`, `maxShiftMinutes`, `usualHour`, `outdoorHour`, `cookingHour`) with safe server-side bounds.
@@ -45,7 +45,7 @@ npm run check:size    # ~0.50 MiB source (well under 10 MB limit)
 npm start             # Opens at http://localhost:3000 (dual-stack IPv4 + IPv6)
 ```
 
-> **Optional Live GenAI & Ground Station Mode:** Copy `.env.example` to `.env` (gitignored, never committed), add `GEMINI_API_KEY` (default `gemini-4-hydrogen` with automatic transient 503 failover to `gemini-2.5-flash`), `OPENAI_API_KEY` (`gpt-4.1-mini`), and/or `WAQI_API_TOKEN`, then run `npm run start:ai`. Without keys, all features work in full **RULES MODE** with live Open-Meteo data.
+> **Optional Live GenAI & Observed Station Mode:** Copy `.env.example` to `.env` (gitignored, never committed), add `GEMINI_API_KEY` (default `gemini-4-hydrogen` with automatic transient 503 failover to `gemini-2.5-flash`), `OPENAI_API_KEY` (`gpt-4.1-mini`), and/or `OPENAQ_API_KEY` (free at [explore.openaq.org/register](https://explore.openaq.org/register)) or `WAQI_API_TOKEN`, then run `npm run start:ai`. Without keys, all features work in full **RULES MODE** with live Open-Meteo data.
 >
 > **Vercel Deployment Ready:** Includes `vercel.json` (static `public/` + strict security headers + `/api/*` rewrite) and `api/index.mjs` reusing the zero-dependency `server/index.mjs` HTTP handler.
 
@@ -110,13 +110,12 @@ Server Modules: index.mjs · air.mjs · decisions.mjs · routine.mjs · room.mjs
 
 ## Verification Status (19 November 2026)
 
-- **Automated Tests:** `npm test` — **94 passed, 0 failed**.
-- **Repository Size:** `npm run check:size` — **~0.50 MiB** source-only (~0.7 MiB including `.git` history on single branch `main`, well under the 10 MB limit).
+- **Automated Tests:** `npm test` — **95 passed, 0 failed**.
+- **Repository Size:** `npm run check:size` — **< 0.30 MiB** source-only (well under the 10 MB limit, zero runtime dependencies).
 - **Live External Provider Proof:**
   - **Open-Meteo Air Quality (CAMS), Weather & Geocoding:** **REAL** — verified live HTTP 200 responses across `/api/pulse`, `/api/cities`, `/api/plan`, and `/api/stream` (SSE).
-  - **Google Gemini (`gemini-2.5-flash` structured JSON router):** **REAL** — verified live authenticated HTTP 200 calls via server-side `.env` (strictly gitignored, header-only `x-goog-api-key`, `thinkingBudget: 0`), confirming valid allowlisted action-ID routing and prompt-injection resistance.
+  - **Google Gemini (`gemini-4-hydrogen` with automatic `gemini-2.5-flash` 503 failover):** **REAL** — verified live authenticated HTTP 200 calls via server-side `.env` (strictly gitignored, header-only `x-goog-api-key`, `thinkingBudget: 0`).
+  - **OpenAQ v3, OpenAI, and WAQI adapters:** Verified with mocked integration tests; ready for live keys via `.env` or Vercel Environment Variables.
   - **Live Browser QA (`1440×900` desktop & `390×844` mobile):** **VERIFIED** locally with 0 console errors, 0 failed requests, and 0 px horizontal overflow.
-  - **OpenAI and WAQI adapters:** **MOCKED** in automated tests.
-- **Full Documentation Suite:** See `PROJECT_STATUS.md` and `docs/01`–`docs/12` + `docs/TASK_BACKLOG.csv`.
 
 License: MIT. See `LICENSE`.

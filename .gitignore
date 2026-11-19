@@ -5,12 +5,19 @@
 *.pem
 *.key
 
+# Internal agent instructions, planning & handoff notes
+AGENTS.md
+*_HANDOFF.md
+PROJECT_STATUS.md
+docs/
+
 # Dependencies & build/test outputs
 node_modules/
 dist/
 build/
 coverage/
 .nyc_output/
+.vercel/
 
 # Logs & temporary files
 *.log
