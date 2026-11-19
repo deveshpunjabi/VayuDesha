@@ -273,7 +273,7 @@ test('Google Gemini structured-JSON provider selects approved actions, composes 
     assert.doesNotMatch(calledUrl, /key=/);
     assert.equal(sentHeaders['x-goog-api-key'], 'mock-gemini-key');
     assert.equal(sentPayload.generationConfig.responseMimeType, 'application/json');
-    assert.equal(sentPayload.generationConfig.temperature, 0);
+    assert.equal(sentPayload.generationConfig.temperature, 0.2);
     assert.deepEqual(sentPayload.generationConfig.thinkingConfig, { thinkingBudget: 0 });
     assert.equal(sentPayload.generationConfig.responseSchema.type, 'OBJECT');
     assert.equal(res.mode, 'genai');

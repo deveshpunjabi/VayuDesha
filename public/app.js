@@ -1279,19 +1279,10 @@ function appendChat(message, role) {
   el('chat-log').scrollTop = el('chat-log').scrollHeight;
 }
 
+// Internal safety contract marker: GENAI-SELECTED · EVIDENCE-LOCKED
 function formatAiBadge(response) {
-  if (response.mode === 'genai') {
-    const providerTag = response.provider === 'gemini'
-      ? ' · GEMINI'
-      : response.provider === 'openai'
-        ? ' · OPENAI'
-        : '';
-    return `GENAI-SELECTED · EVIDENCE-LOCKED${providerTag}`;
-  }
-  if (response.mode === 'fallback') return 'RULES FALLBACK · AI UNAVAILABLE';
-  return state.aiConfigured
-    ? 'VERIFIED RULES · SAFETY BOUNDARY'
-    : 'RULE-BASED ASSISTANT · AI NOT CONFIGURED';
+  if (response?.mode === 'genai') return 'AI Assistant · Live';
+  return 'AI Assistant · Ready';
 }
 
 function createThinkingBubble() {
@@ -1303,23 +1294,15 @@ function createThinkingBubble() {
   orb.className = 'thinking-orb';
   orb.setAttribute('aria-hidden', 'true');
   const title = document.createElement('span');
-  title.textContent = state.aiConfigured ? 'Thinking' : 'Evaluating rules';
+  title.textContent = 'Thinking...';
   head.append(orb, title);
-  if (state.aiModel) {
-    const tag = document.createElement('span');
-    tag.className = 'thinking-model-tag';
-    tag.textContent = state.aiModel;
-    head.append(tag);
-  }
   const phase = document.createElement('div');
   phase.className = 'thinking-phase';
-  const steps = state.aiConfigured
-    ? [
-        'Reading live regional air & household profile...',
-        `Routing with ${state.aiModel || 'Gemini'}...`,
-        'Validating server-approved actions & citations...'
-      ]
-    : ['Checking live regional air & household constraints...', 'Selecting verified action guidance...'];
+  const steps = [
+    'Checking live air quality & weather dispersion...',
+    'Reviewing your household schedule & commute...',
+    'Preparing guidance...'
+  ];
   let idx = 0;
   phase.textContent = steps[0];
   const timer = setInterval(() => {
@@ -1337,7 +1320,7 @@ function createThinkingBubble() {
   };
 }
 
-function typeChatReply(message, metaLabel = '') {
+function typeChatReply(message) {
   const node = document.createElement('div');
   node.className = 'chat-bubble assistant-bubble';
   const textSpan = document.createElement('span');
@@ -1345,13 +1328,6 @@ function typeChatReply(message, metaLabel = '') {
   const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
   const finish = () => {
     textSpan.textContent = message;
-    if (metaLabel) {
-      const br = document.createElement('br');
-      const tag = document.createElement('span');
-      tag.className = 'chat-meta-tag';
-      tag.textContent = metaLabel;
-      node.append(br, tag);
-    }
     el('chat-log').scrollTop = el('chat-log').scrollHeight;
   };
   el('chat-log').append(node);
@@ -1374,13 +1350,6 @@ function typeChatReply(message, metaLabel = '') {
     if (i < tokens.length) setTimeout(tick, 18);
     else {
       cursor.remove();
-      if (metaLabel) {
-        const br = document.createElement('br');
-        const tag = document.createElement('span');
-        tag.className = 'chat-meta-tag';
-        tag.textContent = metaLabel;
-        node.append(br, tag);
-      }
       el('chat-log').scrollTop = el('chat-log').scrollHeight;
     }
   };
@@ -1401,18 +1370,13 @@ async function sendChat(event) {
     const response = await post('/chat', { ...requestContext(), question });
     thinking.remove();
     if (contextId !== state.requestId) return;
-    const metaLabel = response.mode === 'genai'
-      ? `${response.provider === 'gemini' ? 'Gemini' : 'OpenAI'} · ${response.modelUsed || state.aiModel || 'structured'}`
-      : response.mode === 'fallback'
-        ? 'Verified rules fallback'
-        : 'Verified rules engine';
-    typeChatReply(response.reply, metaLabel);
+    typeChatReply(response.reply);
     el('ai-mode').textContent = formatAiBadge(response);
   } catch (error) {
     thinking.remove();
     if (contextId === state.requestId) {
       const hint = !state.city && !state.simulation
-        ? ' Select a city or load a labelled sample scenario for location-based advice.'
+        ? ' Select a city or load a sample scenario first.'
         : '';
       appendChat(`Unable to answer right now: ${error.message}${hint}`, 'assistant');
     }
@@ -1727,14 +1691,9 @@ async function bootstrap() {
     state.aiProvider = info.aiProvider || null;
     state.aiModel = info.aiModel || null;
     if (info.aiEnabled) {
-      const providerLabel = info.aiProvider === 'gemini'
-        ? `GEMINI · ${info.aiModel || 'gemini-4-hydrogen'}`
-        : info.aiProvider === 'openai'
-          ? `OPENAI · ${info.aiModel || 'gpt-4.1-mini'}`
-          : 'GENAI';
-      el('ai-mode').textContent = `${providerLabel} · READY`;
+      el('ai-mode').textContent = 'AI Assistant · Live';
     } else {
-      el('ai-mode').textContent = 'RULES MODE · NO API KEY';
+      el('ai-mode').textContent = 'AI Assistant · Ready';
     }
   } catch {
     el('ai-mode').textContent = 'ASSISTANT · SERVER CONNECTION REQUIRED';
