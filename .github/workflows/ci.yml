@@ -1,4 +1,4 @@
-name: AirWise checks
+name: VayuDesha checks
 on:
   push:
     branches: [main]
@@ -12,5 +12,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - run: npm run lint
       - run: npm test
       - run: npm run check:size

@@ -50,7 +50,8 @@ Browser (Architectural Daylight UI — WCAG 2.1 AA, Zero innerHTML Sinks)
  └── Slide-Over Household Drawer       → 4 Personas + 10 normalized inputs (browser localStorage only)
          │
          ▼  Same-origin validated JSON + SSE (Node.js 22 built-in HTTP, 0 runtime dependencies)
-Server Modules: index.mjs · air.mjs · decisions.mjs · routine.mjs · room.mjs · choices.mjs · compare.mjs · evidence.mjs · ai.mjs
+Server Modules: index.mjs · http-helpers.mjs · air.mjs · air-math.mjs · decisions.mjs · routine.mjs · room.mjs · choices.mjs · compare.mjs · evidence.mjs · ai.mjs · ai-scope.mjs
+Frontend Modules: app.js · dom.js · chart.js · render.js · chat.js
 ```
 
 ### API Endpoints
@@ -89,11 +90,12 @@ Refer to [`.env.example`](.env.example) for all supported configuration variable
 ## 4. Running Automated Tests
 
 ```bash
-npm test                # Runs all 96 built-in node:test unit, integration, security & red-team tests
-npm run check:size      # Verifies repository source footprint (~0.53 MiB, well under 10 MB cap)
+npm run lint            # Runs zero-dependency syntax, XSS/secret & modularity linter across all modules
+npm test                # Runs all 97 built-in node:test unit, integration, security & red-team tests
+npm run check:size      # Verifies repository source footprint (~0.54 MiB, well under 10 MB cap)
 ```
 
-- **Test Suite Coverage (96/96 Passing):**
+- **Test Suite Coverage (97/97 Passing):**
   - `tests/air.test.mjs` & `tests/realtime.test.mjs`: Multi-pollutant normalization, OpenAQ v3 freshness selection & stale-sensor filtering, real-time EPA US AQI conversion, Gemini 2.5 Flash structured schema & failover, in-flight request deduplication, and `/api/health` + `/api/pulse` + `/api/stream` contracts.
   - `tests/ai.test.mjs` & `tests/redteam.test.mjs`: 16 adversarial red-team tests covering prompt injection, respiratory emergencies, medication boundaries, CAQM GRAP legal boundaries, CPCB vs. US AQI index boundaries, and the code/image/off-topic domain gateway.
   - `tests/decisions.test.mjs`, `tests/choices.test.mjs`, `tests/compare.test.mjs`, `tests/v4.test.mjs`: EPA AQI breakpoints, schedule window feasibility, EPA smoke CADR math, avoided motorized travel impact, and room planner validation.
@@ -129,9 +131,9 @@ npx vercel deploy --prod
 |---|---|
 | **Problem Statement Alignment** | Solves Challenge 6 end-to-end: live winter smog & wind dispersion intelligence, OpenAQ v3 physical ground stations, 3–6 step low-emission daily routines, EPA smoke CADR room sizing, fan vs. purifier honesty, sustainable transport swaps with direct impact explanations, and anonymous community briefs. |
 | **GenAI & Google Integration** | Live **Google Gemini (`gemini-2.5-flash`)** structured-JSON synthesis (`reply` + `directImpactSummary` + verified `actionIds`), strict pre/post-LLM domain gateway, and production **Google Cloud Run** containerization (`Dockerfile`). |
-| **Code Quality** | 9 single-responsibility ES2022 `.mjs` server modules + vanilla accessible frontend, zero runtime npm dependencies, zero dead code, consistent `VayuDesha` naming across code, docs, and exports. |
+| **Code Quality** | 12 single-responsibility ES2022 `.mjs` server modules + 5 modular vanilla ES2022 frontend modules (every app module `< 300` lines), `jsconfig.json` + JSDoc type contracts, `npm run lint` static verification, zero runtime npm dependencies, zero dead code. |
 | **Security** | Strict CSP (`default-src 'self'`), `COOP`, `CORP`, `HSTS`, `X-Frame-Options: DENY`, same-origin `POST` enforcement, 12 KB JSON body limit, zero `innerHTML` sinks, header-only API keys (`x-goog-api-key`, `X-API-Key`), per-IP rate & SSE connection caps. |
-| **Efficiency** | **0.53 MiB** total source footprint (~5% of 10 MB limit), in-flight upstream request deduplication, multi-tier TTL caching (10m pulse / 20m air / 6h geocoding), parallel `Promise.all` telemetry ingestion, and graceful SSE-to-polling fallback. |
-| **Testing & Accessibility** | **96/96 passing automated tests** (`node --test`), WCAG 2.1 AA contrast, semantic HTML5 landmarks, keyboard-navigable 4-tab bar & slide-over drawer, `aria-live` announcements, and auto-loaded live Delhi telemetry on initial visit. |
+| **Efficiency** | **0.54 MiB** total source footprint (~5% of 10 MB limit), in-flight upstream request deduplication, multi-tier TTL caching (10m pulse / 20m air / 6h geocoding), parallel `Promise.all` telemetry ingestion, and graceful SSE-to-polling fallback. |
+| **Testing & Accessibility** | **97/97 passing automated tests** (`node --test`), WCAG 2.1 AA contrast, semantic HTML5 landmarks, keyboard-navigable 4-tab bar & slide-over drawer, `aria-live` announcements, and auto-loaded live Delhi telemetry on initial visit. |
 
 License: MIT. See `LICENSE`.

@@ -1,23 +1,39 @@
-/** Same pollution snapshot, two household configurations. No causal health impact estimates. */
+/**
+ * Counterfactual household comparison engine under an identical air-quality snapshot.
+ */
 import { buildPlan, normalizeProfile } from './decisions.mjs';
 
 const ALTERNATIVES = Object.freeze({
-  child: { label: 'Add responsibility for a child', change: { children: true } },
-  cycling: { label: 'Switch the commute to cycling', change: { commute: 'cycle' } },
-  fixed: { label: 'Make the daily schedule fixed', change: { flexibility: 'fixed' } },
-  no_budget: { label: 'Limit the budget to free actions', change: { budget: 'free', home: 'none' } }
+  child: Object.freeze({ label: 'Add responsibility for a child', change: { children: true } }),
+  cycling: Object.freeze({ label: 'Switch the commute to cycling', change: { commute: 'cycle' } }),
+  fixed: Object.freeze({ label: 'Make the daily schedule fixed', change: { flexibility: 'fixed' } }),
+  no_budget: Object.freeze({ label: 'Limit the budget to free actions', change: { budget: 'free', home: 'none' } })
 });
-export const ALTERNATIVE_OPTIONS = Object.entries(ALTERNATIVES).map(([id, value]) => ({ id, label: value.label }));
+
+export const ALTERNATIVE_OPTIONS = Object.freeze(
+  Object.entries(ALTERNATIVES).map(([id, value]) => Object.freeze({ id, label: value.label }))
+);
 
 function distilled(plan) {
   return {
     category: plan.category.name,
-    actions: plan.recommendations.map(({ id, title, action, why, source, priority }) =>
-      ({ id, title, action, why, source, priority })),
+    actions: plan.recommendations.map(({ id, title, action, why, source, priority }) => ({
+      id, title, action, why, source, priority
+    })),
     bestWindow: plan.window ? { time: plan.window.time, predictedAqi: plan.window.predictedAqi } : null,
     departureComparisonAvailable: Boolean(plan.comparison)
   };
 }
+
+/**
+ * Compares recommendation rule changes when toggling a single household constraint.
+ * @param {Record<string, any>} air
+ * @param {Record<string, any>} originalProfile
+ * @param {string} alternativeId
+ * @param {string} [timezone='UTC']
+ * @param {number} [now=Date.now()]
+ * @returns {Record<string, any>}
+ */
 export function compareHouseholds(air, originalProfile, alternativeId, timezone = 'UTC', now = Date.now()) {
   const selected = ALTERNATIVES[alternativeId];
   if (!selected) throw new Error('Choose one of the available household changes.');
@@ -36,8 +52,13 @@ export function compareHouseholds(air, originalProfile, alternativeId, timezone 
   const scheduleChanged = Boolean(previous.bestWindow) !== Boolean(next.bestWindow) ||
     previous.departureComparisonAvailable !== next.departureComparisonAvailable;
   return {
-    alternativeId, alternativeLabel: selected.label, beforeProfile: before, afterProfile: after,
-    before: previous, after: next, changes: { added, removed, modified, scheduleChanged },
+    alternativeId,
+    alternativeLabel: selected.label,
+    beforeProfile: before,
+    afterProfile: after,
+    before: previous,
+    after: next,
+    changes: { added, removed, modified, scheduleChanged },
     changedFields: Object.keys(after).filter(k => before[k] !== after[k]),
     sourceType: air.sourceType,
     caveat: 'Same outdoor model data, different household assumptions. These changes represent recommendation logic, not measured exposure, health benefit, or emissions savings.'
