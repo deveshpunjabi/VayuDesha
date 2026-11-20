@@ -569,9 +569,7 @@ async function selectCity(city) {
 async function loadSimulation(scenarioOverride = null) {
   state.searchId++;
   stopLiveStream();
-  const scenario = scenarioOverride || el('demo-scenario').value;
-  el('demo-scenario').value = scenario;
-  el('landing-demo-scenario').value = scenario;
+  const scenario = scenarioOverride || state.demoScenario || 'unhealthy';
   state.city = null;
   state.simulation = true;
   state.demoScenario = scenario;
@@ -1464,7 +1462,7 @@ function installHandlers() {
   el('nav-dashboard-btn').addEventListener('click', openDashboard);
   el('open-dashboard-cta').addEventListener('click', openDashboard);
 
-  // Landing search & demo controls
+  // Landing search controls
   el('landing-city-form').addEventListener('submit', async event => {
     event.preventDefault();
     try {
@@ -1475,30 +1473,11 @@ function installHandlers() {
     }
   });
 
-  el('landing-demo-scenario').addEventListener('change', () => {
-    el('demo-scenario').value = el('landing-demo-scenario').value;
-  });
-
-  el('landing-demo-button').addEventListener('click', () => {
-    const scenario = el('landing-demo-scenario').value;
-    showView('dashboard', 'live');
-    window.scrollTo({ top: 0, behavior: 'auto' });
-    void loadSimulation(scenario);
-  });
-
-  // Dashboard search & demo controls
+  // Dashboard search controls
   el('city-form').addEventListener('submit', async event => {
     event.preventDefault();
     try { await searchCity(el('city-input').value, false, 'dashboard'); }
     catch (error) { status(error.message); }
-  });
-
-  el('demo-scenario').addEventListener('change', () => {
-    el('landing-demo-scenario').value = el('demo-scenario').value;
-  });
-
-  el('demo-button').addEventListener('click', () => {
-    void loadSimulation(el('demo-scenario').value);
   });
 
   // 4-Tab navigation with ArrowLeft / ArrowRight / Home / End keyboard support

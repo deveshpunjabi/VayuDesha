@@ -144,17 +144,60 @@ async function fetchWeather(lat, lon, fetcher = fetch) {
     return null;
   }
 }
+export function pm25ToUsAqi(pm25) {
+  if (!Number.isFinite(pm25) || pm25 < 0) return null;
+  const c = Math.floor(pm25 * 10) / 10;
+  const bp = [
+    [0.0, 9.0, 0, 50],
+    [9.1, 35.4, 51, 100],
+    [35.5, 55.4, 101, 150],
+    [55.5, 125.4, 151, 200],
+    [125.5, 225.4, 201, 300],
+    [225.5, 325.4, 301, 400],
+    [325.5, 500.4, 401, 500]
+  ];
+  for (const [cLo, cHi, iLo, iHi] of bp) {
+    if (c <= cHi) return Math.round(((iHi - iLo) / (cHi - cLo)) * (c - cLo) + iLo);
+  }
+  return 500;
+}
+
+export function pm10ToUsAqi(pm10) {
+  if (!Number.isFinite(pm10) || pm10 < 0) return null;
+  const c = Math.floor(pm10);
+  const bp = [
+    [0, 54, 0, 50],
+    [55, 154, 51, 100],
+    [155, 254, 101, 150],
+    [255, 354, 151, 200],
+    [355, 424, 201, 300],
+    [425, 604, 301, 500]
+  ];
+  for (const [cLo, cHi, iLo, iHi] of bp) {
+    if (c <= cHi) return Math.round(((iHi - iLo) / (cHi - cLo)) * (c - cLo) + iLo);
+  }
+  return 500;
+}
+
+export function computeUsAqi(pm25, pm10) {
+  const a25 = pm25ToUsAqi(pm25);
+  const a10 = pm10ToUsAqi(pm10);
+  if (a25 !== null && a10 !== null) return Math.max(a25, a10);
+  return a25 ?? a10 ?? null;
+}
+
 export async function getOpenAqStation(lat, lon, fetcher = fetch) {
   const apiKey = String(process.env.OPENAQ_API_KEY || '').trim();
   if (!apiKey) return null;
   try {
     const headers = { accept: 'application/json', 'X-API-Key': apiKey };
-    const locUrl = `${OPENAQ_URL}/locations?coordinates=${lat},${lon}&radius=25000&limit=50`;
+    const locUrl = `${OPENAQ_URL}/locations?coordinates=${lat},${lon}&radius=25000&parameters_id=2&limit=100`;
     const locRes = await fetcher(locUrl, { signal: AbortSignal.timeout(6500), headers });
     if (!locRes?.ok) return null;
     const locData = await locRes.json().catch(() => null);
     const results = Array.isArray(locData?.results) ? locData.results : [];
     const cutoffMs = Date.now() - 48 * 3600_000;
+    const bucketMs = 45 * 60_000;
     const candidates = results
       .filter(item => {
         if (!Number.isFinite(item?.id) || !Array.isArray(item.sensors) || !item.sensors.length) return false;
@@ -166,26 +209,39 @@ export async function getOpenAqStation(lat, lon, fetcher = fetch) {
         const aHasPm = a.sensors.some(s => /^pm(25|10)$/i.test(String(s.parameter?.name || ''))) ? 1 : 0;
         const bHasPm = b.sensors.some(s => /^pm(25|10)$/i.test(String(s.parameter?.name || ''))) ? 1 : 0;
         if (aHasPm !== bHasPm) return bHasPm - aHasPm;
-        const aRef = (a.isMonitor || /CPCB|AirNow|EPA|DEFRA/i.test(String(a.provider?.name || ''))) ? 1 : 0;
-        const bRef = (b.isMonitor || /CPCB|AirNow|EPA|DEFRA/i.test(String(b.provider?.name || ''))) ? 1 : 0;
-        if (aRef !== bRef) return bRef - aRef;
+        const aBucket = Math.floor((Date.parse(a.datetimeLast?.utc || '') || 0) / bucketMs);
+        const bBucket = Math.floor((Date.parse(b.datetimeLast?.utc || '') || 0) / bucketMs);
+        if (aBucket !== bBucket) return bBucket - aBucket;
         const aDist = Number.isFinite(a.distance) ? a.distance : 999999;
         const bDist = Number.isFinite(b.distance) ? b.distance : 999999;
-        if (Math.abs(aDist - bDist) > 500) return aDist - bDist;
-        return (Date.parse(b.datetimeLast?.utc || '') || 0) - (Date.parse(a.datetimeLast?.utc || '') || 0);
+        if (Math.abs(aDist - bDist) > 1000) return aDist - bDist;
+        const aRef = (a.isMonitor || /CPCB|AirNow|EPA|DEFRA/i.test(String(a.provider?.name || ''))) ? 1 : 0;
+        const bRef = (b.isMonitor || /CPCB|AirNow|EPA|DEFRA/i.test(String(b.provider?.name || ''))) ? 1 : 0;
+        return bRef - aRef;
       });
 
-    for (const station of candidates.slice(0, 3)) {
-      const latestUrl = `${OPENAQ_URL}/locations/${encodeURIComponent(String(station.id))}/latest`;
-      const latestRes = await fetcher(latestUrl, { signal: AbortSignal.timeout(6500), headers });
-      if (!latestRes?.ok) continue;
-      const latestData = await latestRes.json().catch(() => null);
-      const measurements = Array.isArray(latestData?.results) ? latestData.results : [];
-      if (!measurements.length) continue;
+    const topStations = candidates.slice(0, 3);
+    const latestPayloads = await Promise.all(topStations.map(async station => {
+      try {
+        const latestUrl = `${OPENAQ_URL}/locations/${encodeURIComponent(String(station.id))}/latest`;
+        const latestRes = await fetcher(latestUrl, { signal: AbortSignal.timeout(6500), headers });
+        if (!latestRes?.ok) return null;
+        const latestData = await latestRes.json().catch(() => null);
+        return { station, measurements: Array.isArray(latestData?.results) ? latestData.results : [] };
+      } catch {
+        return null;
+      }
+    }));
 
+    let primaryStation = null;
+    const mergedReadings = {};
+    let latestTime = null;
+
+    for (const item of latestPayloads) {
+      if (!item || !item.measurements.length) continue;
+      const { station, measurements } = item;
       const sensorMap = new Map(station.sensors.map(s => [s.id, s.parameter]));
-      const readings = {};
-      let latestTime = null;
+      const stationReadings = {};
       for (const m of measurements) {
         const param = sensorMap.get(m.sensorsId);
         const val = numberOrNull(m.value);
@@ -194,31 +250,39 @@ export async function getOpenAqStation(lat, lon, fetcher = fetch) {
         const dtMs = dt ? Date.parse(dt) : NaN;
         if (Number.isFinite(dtMs) && dtMs < cutoffMs) continue;
         const key = String(param.name).toLowerCase();
-        const prevMs = readings[key]?.time ? Date.parse(readings[key].time) : -Infinity;
-        if (!readings[key] || (Number.isFinite(dtMs) && dtMs >= prevMs)) {
-          readings[key] = { value: Math.round(val * 10) / 10, unit: String(param.units || 'µg/m³'), time: dt };
+        const prevMs = stationReadings[key]?.time ? Date.parse(stationReadings[key].time) : -Infinity;
+        if (!stationReadings[key] || (Number.isFinite(dtMs) && dtMs >= prevMs)) {
+          stationReadings[key] = { value: Math.round(val * 10) / 10, unit: String(param.units || 'µg/m³'), time: dt };
         }
         if (dt && (!latestTime || Date.parse(dt) > Date.parse(latestTime))) latestTime = dt;
       }
-      const primaryKey = ['pm25', 'pm10', 'no2', 'o3', 'so2', 'co'].find(k => readings[k]) || Object.keys(readings)[0];
-      if (!primaryKey) continue;
-
-      const providerName = station.provider?.name ? String(station.provider.name).slice(0, 60) : 'OpenAQ Network';
-      return {
-        stationName: String(station.name || station.locality || 'OpenAQ Ground Station').slice(0, 140),
-        provider: providerName,
-        aqi: null,
-        primaryValue: readings[primaryKey].value,
-        primaryUnit: readings[primaryKey].unit,
-        dominantPollutant: primaryKey,
-        readings,
-        time: readings[primaryKey].time || latestTime,
-        source: `OpenAQ v3 (${providerName})`,
-        sourceType: 'observed',
-        url: `https://explore.openaq.org/locations/${station.id}`
-      };
+      const hasPrimary = ['pm25', 'pm10', 'no2', 'o3', 'so2', 'co'].some(k => stationReadings[k]) || Object.keys(stationReadings).length > 0;
+      if (!hasPrimary) continue;
+      if (!primaryStation) primaryStation = station;
+      for (const [k, v] of Object.entries(stationReadings)) {
+        if (!mergedReadings[k]) mergedReadings[k] = v;
+      }
     }
-    return null;
+
+    if (!primaryStation) return null;
+    const primaryKey = ['pm25', 'pm10', 'no2', 'o3', 'so2', 'co'].find(k => mergedReadings[k]) || Object.keys(mergedReadings)[0];
+    if (!primaryKey) return null;
+
+    const computedAqi = computeUsAqi(mergedReadings.pm25?.value, mergedReadings.pm10?.value);
+    const providerName = primaryStation.provider?.name ? String(primaryStation.provider.name).slice(0, 60) : 'OpenAQ Network';
+    return {
+      stationName: String(primaryStation.name || primaryStation.locality || 'OpenAQ Ground Station').slice(0, 140),
+      provider: providerName,
+      aqi: computedAqi,
+      primaryValue: mergedReadings[primaryKey].value,
+      primaryUnit: mergedReadings[primaryKey].unit,
+      dominantPollutant: primaryKey,
+      readings: mergedReadings,
+      time: mergedReadings[primaryKey].time || latestTime,
+      source: `OpenAQ v3 (${providerName})`,
+      sourceType: 'observed',
+      url: `https://explore.openaq.org/locations/${primaryStation.id}`
+    };
   } catch {
     return null;
   }
@@ -322,6 +386,20 @@ export async function getAir(rawLat, rawLon, fetcher = fetch) {
       getObservedStation(lat, lon, fetcher)
     ]);
     const air = normalizeAir(data, { lat, lon });
+    if (fetcher === fetch) {
+      if (observedStation && Number.isFinite(observedStation.aqi)) {
+        air.current.aqi = observedStation.aqi;
+        if (Number.isFinite(observedStation.readings?.pm25?.value)) {
+          air.current.pm25 = observedStation.readings.pm25.value;
+        }
+        if (Number.isFinite(observedStation.readings?.pm10?.value)) {
+          air.current.pm10 = observedStation.readings.pm10.value;
+        }
+      } else {
+        const instantAqi = computeUsAqi(air.current.pm25, air.current.pm10);
+        if (instantAqi !== null) air.current.aqi = instantAqi;
+      }
+    }
     return { ...air, weather, observedStation };
   });
 }
@@ -347,14 +425,26 @@ export async function getLiveCityPulse(fetcher = fetch) {
         weatherUrl.searchParams.set('current', 'wind_speed_10m,temperature_2m');
         weatherUrl.searchParams.set('timezone', 'GMT');
 
-        const [airData, weatherData] = await Promise.all([
+        const [airData, weatherData, observed] = await Promise.all([
           requestJson(airUrl.toString(), fetcher),
-          requestJson(weatherUrl.toString(), fetcher).catch(() => null)
+          requestJson(weatherUrl.toString(), fetcher).catch(() => null),
+          fetcher === fetch ? getOpenAqStation(city.latitude, city.longitude, fetcher).catch(() => null) : Promise.resolve(null)
         ]);
         const c = airData?.current ?? {};
-        const aqi = numberOrNull(c.us_aqi);
-        const pm25 = numberOrNull(c.pm2_5);
+        let aqi = numberOrNull(c.us_aqi);
+        let pm25 = numberOrNull(c.pm2_5);
         const time = normalizeIsoMinute(c.time);
+        if (fetcher === fetch) {
+          if (observed && Number.isFinite(observed.aqi)) {
+            aqi = observed.aqi;
+            if (Number.isFinite(observed.readings?.pm25?.value)) {
+              pm25 = observed.readings.pm25.value;
+            }
+          } else {
+            const instant = computeUsAqi(pm25, null);
+            if (instant !== null) aqi = instant;
+          }
+        }
         if (aqi === null) throw new Error('Unavailable');
         const cat = categoryForUsAqi(aqi);
         const windRaw = numberOrNull(weatherData?.current?.wind_speed_10m);
