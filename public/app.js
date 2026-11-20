@@ -728,19 +728,23 @@ function render() {
   const air = state.air;
   const plan = state.plan;
   el('air-hero').dataset.tone = plan?.category?.tone || 'unknown';
-  el('simulation-banner').classList.toggle('hidden', !state.simulation || !air);
+  const simActive = Boolean(state.simulation && air);
+  const simBanner = el('simulation-banner');
+  simBanner.classList.toggle('hidden', !simActive);
+  simBanner.hidden = !simActive;
+  simBanner.setAttribute('aria-hidden', String(!simActive));
 
   const locationTitle = state.simulation
     ? 'Sample city · simulation'
     : state.city
       ? `${state.city.name}, ${state.city.country}`
-      : 'Choose your city';
+      : 'Delhi, India';
   el('air-title').textContent = locationTitle;
   el('header-location').textContent = state.simulation
     ? `Sample (${state.demoScenario})`
     : state.city
       ? `${state.city.name}, ${state.city.country}`
-      : 'No city selected';
+      : 'Delhi, India';
 
   el('aqi-number').textContent = displayNumber(air?.current?.aqi);
   el('aqi-category').textContent = plan?.category?.name || 'Not available';
@@ -820,7 +824,7 @@ function render() {
 
   el('brief-status').textContent = air
     ? (state.simulation ? 'PERSONAL BRIEF · SYNTHETIC DEMO' : 'PERSONAL BRIEF · REGIONAL MODEL DATA')
-    : 'PERSONAL BRIEF · WAITING FOR A CITY';
+    : 'PERSONAL BRIEF · LOADING LIVE DELHI TELEMETRY';
   updateSyncStatus();
 }
 

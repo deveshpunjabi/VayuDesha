@@ -183,7 +183,7 @@
               <div class="scale-legend-item"><span class="swatch tone-very-unhealthy"></span><span class="scale-range">201–300</span><span class="scale-label">Very Unhealthy</span></div>
               <div class="scale-legend-item"><span class="swatch tone-hazardous"></span><span class="scale-range">301+</span><span class="scale-label">Hazardous</span></div>
             </div>
-            <p class="scale-footnote">Live readings come from Open-Meteo / Copernicus CAMS regional models on the US AQI scale, not local ground sensors or India CPCB AQI.</p>
+            <p class="scale-footnote">Regional forecasts use Open-Meteo / Copernicus CAMS on the US AQI scale, paired with live OpenAQ v3 physical ground monitors where available.</p>
           </aside>
         </section>
       </div>
@@ -236,18 +236,18 @@
           <div class="status-strip">
             <div class="toolbar-meta">
               <span class="toolbar-chip">
-                <span class="live-dot" aria-hidden="true"></span>
-                <span id="brief-status">WAITING FOR A CITY</span>
+                <span class="live-dot is-live" aria-hidden="true"></span>
+                <span id="brief-status">LOADING LIVE DELHI TELEMETRY</span>
               </span>
               <span class="toolbar-divider" aria-hidden="true"></span>
-              <span id="live-sync-status" class="toolbar-text">Sync idle</span>
+              <span id="live-sync-status" class="toolbar-text">Connecting live stream…</span>
               <span class="toolbar-divider" aria-hidden="true"></span>
-              <span id="model-mode" class="toolbar-text muted">Ready</span>
+              <span id="model-mode" class="toolbar-text muted">CAMS + OpenAQ v3</span>
             </div>
-            <div id="status-message" class="status-message" role="status" aria-live="polite">Select a city or load a sample scenario.</div>
+            <div id="status-message" class="status-message" role="status" aria-live="polite">Loading live Delhi air-quality and ground-station telemetry…</div>
           </div>
 
-          <div id="simulation-banner" class="simulation-banner hidden" role="alert">
+          <div id="simulation-banner" class="simulation-banner hidden" role="alert" hidden aria-hidden="true">
             <svg class="icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
               <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/>
               <path d="M12 9v4"/><path d="M12 17h.01"/>
@@ -496,13 +496,13 @@
             <div class="panel-header-row">
               <div>
                 <h2 id="decision-title">Commute &amp; routine trade-offs</h2>
-                <p class="muted small" id="choices-headline">Compare options across exposure, emissions, and cost.</p>
+                <p class="muted small" id="choices-headline">Compare options across personal exposure, tailpipe emissions, cost, and direct impact.</p>
               </div>
             </div>
             <div id="choice-cards" class="choice-grid">
               <div class="empty-state">Trade-off comparisons appear after loading a location.</div>
             </div>
-            <p class="small muted" id="choices-methodology">Qualitative comparison based on US AQI category and your profile.</p>
+            <p class="small muted" id="choices-methodology">Qualitative comparison based on US AQI category, your profile, and typical urban fleet reference context.</p>
           </section>
 
           <section class="panel timing-shift-panel" aria-labelledby="timing-shift-title">
@@ -606,7 +606,7 @@
         </div>
 
         <!-- =================================================
-             TAB PANEL 4: ASK AIRWISE & COMMUNITY
+             TAB PANEL 4: ASK VAYUDESHA & COMMUNITY
              ================================================= -->
         <div id="tab-community" class="tab-panel hidden" role="tabpanel" aria-labelledby="tab-btn-community">
           <section id="assistant" class="panel assistant-section" aria-labelledby="assistant-title">
@@ -670,18 +670,19 @@
             <div class="transparency-grid">
               <div class="transparency-box">
                 <h3>Included data</h3>
-                <p>Regional modelled US AQI, six outdoor pollutants, 24-hour forecasts, surface wind dispersion, and your local household profile.</p>
+                <p>Regional modelled US AQI (Open-Meteo / CAMS), live OpenAQ v3 observed ground stations, six outdoor pollutants, 24-hour forecasts, surface wind dispersion, and your local household profile.</p>
               </div>
               <div class="transparency-box">
                 <h3>Not measured</h3>
-                <p>Indoor PM2.5 levels, street-level pollution, personal inhaled dose, medical risk percentages, active GRAP orders, or personal CO₂ savings.</p>
+                <p>Indoor PM2.5 levels, street-level pollution, personal inhaled dose, medical risk percentages, active GRAP orders, or sensor-measured vehicle CO₂ savings.</p>
               </div>
             </div>
-            <p class="small muted" id="source-disclosure">Live readings use Open-Meteo / Copernicus CAMS regional models reported on the US AQI scale, not official India CPCB station monitors.</p>
+            <p class="small muted" id="source-disclosure">Regional forecasts use Open-Meteo / Copernicus CAMS reported on the US AQI scale, paired with live OpenAQ v3 observed ground stations where available.</p>
             <div class="evidence-links">
               <span class="small muted">References:</span>
               <a href="https://www.airnow.gov/aqi/aqi-basics/" target="_blank" rel="noopener noreferrer">EPA AirNow</a>
               <a href="https://www.epa.gov/wildfires/how-create-cleaner-air-room-home" target="_blank" rel="noopener noreferrer">EPA Indoor Air</a>
+              <a href="https://openaq.org/" target="_blank" rel="noopener noreferrer">OpenAQ v3</a>
               <a href="https://open-meteo.com/en/docs/air-quality-api" target="_blank" rel="noopener noreferrer">Open-Meteo API</a>
               <a href="https://app.cpcbccr.com/ccr_docs/About_AQI.pdf" target="_blank" rel="noopener noreferrer">India CPCB AQI</a>
               <a href="https://caqm.nic.in/" target="_blank" rel="noopener noreferrer">CAQM Portal</a>
@@ -695,7 +696,7 @@
   <footer class="site-footer" role="contentinfo">
     <div class="container footer-inner">
       <span>VayuDesha · Urban Air Quality Assistant</span>
-      <span>Data: <a href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer">Open-Meteo</a> &amp; Copernicus CAMS · Geocoding: GeoNames</span>
+      <span>Data: <a href="https://openaq.org/" target="_blank" rel="noopener noreferrer">OpenAQ v3</a>, <a href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer">Open-Meteo</a> &amp; Copernicus CAMS · Geocoding: GeoNames</span>
     </div>
   </footer>
 
