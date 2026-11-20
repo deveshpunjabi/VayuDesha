@@ -92,10 +92,15 @@ export function avoidedMotorizedDistance(oneWayKm, trips = 1, mode = 'car') {
   if (!Number.isFinite(km) || km <= 0 || km > 150 || !Number.isInteger(days) || days < 1 || days > 7) {
     throw new Error('Distance must be 0–150 km and round trips must be 1–7.');
   }
+  const totalKm = Math.round(km * 2 * days * 10) / 10;
+  const referenceBenchmark = mode === 'car'
+    ? 'Typical Indian urban passenger-car reference (ARAI / CPCB fleet context): replacing solo car trips with metro/bus transit or trip-chaining avoids cold-start tailpipe exhaust and resuspended road/brake dust.'
+    : 'Typical Indian urban two-wheeler reference (ARAI / CPCB fleet context): replacing solo scooter/motorcycle trips with shared transit or bundled errands lowers street-level tailpipe particulate and hydrocarbon emissions.';
   return {
-    vehicleKilometresNotDriven: Math.round(km * 2 * days * 10) / 10,
+    vehicleKilometresNotDriven: totalKm,
     unit: 'vehicle-km',
     assumption: `${days} round trip(s) of ${km} km one way by ${mode} entirely avoided, without a replacement motorized trip.`,
+    referenceBenchmark,
     caveat: 'This is travel activity avoided, not measured CO₂, air-quality improvement, or personal exposure. Other travel can offset the benefit.'
   };
 }

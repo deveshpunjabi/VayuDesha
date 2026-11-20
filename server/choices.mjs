@@ -14,7 +14,8 @@ export function buildChoices(air, inputProfile = {}) {
       id: 'remote', title: 'Avoid an optional trip', tag: 'Consider first',
       exposure: 'Avoids that outdoor trip', emissions: 'Avoids associated personal motorized trip only when one is displaced', cost: 'Usually no travel fare',
       fit: veryPolluted ? 'strong' : 'possible',
-      reasoning: 'Works only if the trip is optional or remote participation is genuinely available.',
+      reasoning: 'Works only if the trip is optional or remote participation is genuinely available. Bundling errands into a single trip also cuts cold-start exhaust.',
+      directImpact: 'Eliminates both outdoor commute inhalation during winter smog peaks and direct tailpipe/road-dust output from an optional motorized trip.',
       limitation: 'Indoor air may still be polluted; a necessary trip cannot always be skipped.',
       source: SOURCES.transport
     },
@@ -22,7 +23,8 @@ export function buildChoices(air, inputProfile = {}) {
       id: 'transit', title: 'Choose shared transport', tag: 'Practical alternative',
       exposure: 'Varies by station, waiting time and ventilation', emissions: 'Potentially lower per-person transport emissions than a solo vehicle', cost: 'Fare and transfers vary',
       fit: p.commute === 'transit' ? 'strong' : 'possible',
-      reasoning: 'Useful when it reduces private vehicle travel and requires manageable outdoor waiting.',
+      reasoning: 'Useful when metro, electric rail, or shared buses replace private car or two-wheeler travel with manageable outdoor waiting.',
+      directImpact: 'Spreads transport emissions across shared capacity rather than adding another solo tailpipe to congested winter corridors.',
       limitation: 'A route-specific cleaner-air claim cannot be made from regional model data.',
       source: SOURCES.transport
     },
@@ -33,6 +35,9 @@ export function buildChoices(air, inputProfile = {}) {
       reasoning: polluted
         ? 'Outdoor exertion can increase pollutant inhalation, so do not choose active travel solely for emission savings during elevated pollution.'
         : 'Consider personal needs, route conditions, traffic safety and exposure. Low AQI is not zero risk.',
+      directImpact: polluted
+        ? 'Zero tailpipe exhaust, but deeper breathing during severe smog increases personal particulate intake compared with enclosed transit.'
+        : 'Zero direct tailpipe emissions and active mobility when ambient particulate levels are relatively lower.',
       limitation: 'Actual breathed dose depends on pace, microenvironment, duration and individual circumstances.',
       source: SOURCES.particleGuide
     },
@@ -43,6 +48,9 @@ export function buildChoices(air, inputProfile = {}) {
       reasoning: canShift
         ? 'Only compare forecast hours inside your declared maximum time shift. A 15-minute change cannot be resolved by hourly forecasts.'
         : 'A fixed or sub-hour shift cannot justify choosing another forecast hour; prefer feasible protective choices.',
+      directImpact: canShift
+        ? 'Shifts outdoor errands away from shallow morning inversion hours toward afternoon boundary-layer dispersion windows when forecast PM2.5 is lower.'
+        : 'Preserves mandatory school or shift commitments while focusing on exertion reduction and indoor source control.',
       limitation: 'Forecast timing is uncertain and can be different from conditions at street level.',
       source: SOURCES.particleGuide
     }

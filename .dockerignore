@@ -1,0 +1,16 @@
+.git
+.github
+.env
+.env.*
+!.env.example
+.vercel
+node_modules
+tests
+scripts
+docs
+AGENTS.md
+PROJECT_STATUS.md
+*_HANDOFF.md
+*.log
+*.zip
+*.png

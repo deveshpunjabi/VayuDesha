@@ -283,22 +283,14 @@ async function ensureDashboardLoaded() {
     return;
   }
   const delhiPulse = state.pulseCities.find(c => c.id === 'delhi');
-  if (delhiPulse) {
-    await selectCity({
-      name: delhiPulse.name,
-      region: delhiPulse.region,
-      country: delhiPulse.country,
-      timezone: delhiPulse.timezone,
-      latitude: delhiPulse.latitude,
-      longitude: delhiPulse.longitude
-    });
-    return;
-  }
-  try {
-    await searchCity('Delhi', true, 'dashboard');
-  } catch (error) {
-    status(`${error.message} Choose a city or explore a clearly labelled sample scenario.`);
-  }
+  await selectCity({
+    name: delhiPulse?.name || 'Delhi',
+    region: delhiPulse?.region || 'Delhi',
+    country: delhiPulse?.country || 'India',
+    timezone: delhiPulse?.timezone || 'Asia/Kolkata',
+    latitude: delhiPulse?.latitude ?? 28.61,
+    longitude: delhiPulse?.longitude ?? 77.21
+  });
 }
 
 function formatRelativeAge(timestampMs) {
@@ -1148,6 +1140,9 @@ function renderChoices(data) {
       addText(line, 'span', '', value);
     }
     addText(card, 'p', 'choice-reason', item.reasoning);
+    if (item.directImpact) {
+      addText(card, 'p', 'choice-reason', `Direct impact: ${item.directImpact}`);
+    }
     addText(card, 'p', 'choice-caveat', `Limit: ${item.limitation}`);
     const evidence = addText(card, 'p', 'choice-evidence', '');
     const link = document.createElement('a');
@@ -1542,7 +1537,7 @@ function installHandlers() {
       Object.keys(localStorage).filter(k => k.startsWith('airwise.')).forEach(k => localStorage.removeItem(k));
     } catch { /* ignore */ }
     resetProfileDefaults();
-    status('Local AirWise preferences and saved city have been cleared.');
+    status('Local VayuDesha preferences and saved city have been cleared.');
     if (state.city || state.simulation) void refreshPlan();
   });
 
@@ -1573,7 +1568,8 @@ function installHandlers() {
         mode: el('trip-mode').value
       });
       const info = await api(`/travel-impact?${params}`);
-      el('impact-result').textContent = `${info.vehicleKilometresNotDriven} ${info.unit} avoided. ${info.assumption} ${info.caveat}`;
+      const refText = info.referenceBenchmark ? ` ${info.referenceBenchmark}` : '';
+      el('impact-result').textContent = `${info.vehicleKilometresNotDriven} ${info.unit} avoided. ${info.assumption}${refText} ${info.caveat}`;
     } catch (error) {
       el('impact-result').textContent = error.message;
     }
@@ -1691,12 +1687,8 @@ async function bootstrap() {
   }
 
   void loadPulse();
-
   if (!openedDashboard) {
-    const savedCity = safeLoad('airwise.city');
-    if (savedCity && typeof savedCity.name === 'string') {
-      el('header-location').textContent = [savedCity.name, savedCity.country].filter(Boolean).join(', ');
-    }
+    void ensureDashboardLoaded();
   }
 }
 

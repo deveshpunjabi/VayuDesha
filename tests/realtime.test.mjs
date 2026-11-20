@@ -247,7 +247,7 @@ test('getLiveCityPulse normalizes 4 Indian cities with model provenance and hand
 });
 
 test('Google Gemini structured-JSON provider selects approved actions, composes server-authored response, and falls back safely', async () => {
-  await withEnv({ GEMINI_API_KEY: 'mock-gemini-key', OPENAI_API_KEY: undefined, AI_PROVIDER: undefined }, async () => {
+  await withEnv({ GEMINI_API_KEY: 'mock-gemini-key', GEMINI_MODEL: undefined, GEMINI_FALLBACK_MODEL: undefined, OPENAI_API_KEY: undefined, AI_PROVIDER: undefined }, async () => {
     assert.equal(activeAiProvider(), 'gemini');
 
     let calledUrl = '';
@@ -262,14 +262,23 @@ test('Google Gemini structured-JSON provider selects approved actions, composes 
         json: async () => ({
           candidates: [{
             finishReason: 'STOP',
-            content: { parts: [{ text: JSON.stringify({ status: 'supported', actionIds: ['children', 'outdoor'] }) }] }
+            content: {
+              parts: [{
+                text: JSON.stringify({
+                  status: 'supported',
+                  actionIds: ['children', 'outdoor'],
+                  reply: 'With simulated US AQI at 183 and light winds slowing dispersion, outdoor school play should move indoors today.',
+                  directImpactSummary: 'Moving vigorous play indoors lowers outdoor particle exposure while avoiding extra motorized trips.'
+                })
+              }]
+            }
           }]
         })
       };
     };
 
     const res = await getAssistantReply('Should my child play outside today?', getSimulatedAir(), { children: true }, 'Asia/Kolkata', okFetcher);
-    assert.match(calledUrl, /generativelanguage\.googleapis\.com\/v1beta\/models\/gemini-4-hydrogen:generateContent$/);
+    assert.match(calledUrl, /generativelanguage\.googleapis\.com\/v1beta\/models\/gemini-2\.5-flash:generateContent$/);
     assert.doesNotMatch(calledUrl, /key=/);
     assert.equal(sentHeaders['x-goog-api-key'], 'mock-gemini-key');
     assert.equal(sentPayload.generationConfig.responseMimeType, 'application/json');
@@ -280,6 +289,7 @@ test('Google Gemini structured-JSON provider selects approved actions, composes 
     assert.equal(res.provider, 'gemini');
     assert.equal(res.status, 'supported');
     assert.match(res.reply, /DEMO ONLY/);
+    assert.match(res.reply, /Direct impact:/);
     assert.match(res.reply, /Evidence:/);
     assert.deepEqual(res.evidence.map(e => e.id), ['children', 'outdoor']);
 
@@ -287,7 +297,7 @@ test('Google Gemini structured-JSON provider selects approved actions, composes 
     const calledModels = [];
     const failoverRes = await getAssistantReply('Should my child play outside today?', getSimulatedAir(), { children: true }, 'Asia/Kolkata', async url => {
       calledModels.push(url);
-      if (url.includes('gemini-4-hydrogen')) return { ok: false, status: 503, json: async () => ({ error: { code: 503 } }) };
+      if (url.includes('gemini-2.5-flash')) return { ok: false, status: 503, json: async () => ({ error: { code: 503 } }) };
       return {
         ok: true,
         json: async () => ({
@@ -296,8 +306,8 @@ test('Google Gemini structured-JSON provider selects approved actions, composes 
       };
     });
     assert.equal(calledModels.length, 2);
-    assert.match(calledModels[0], /gemini-4-hydrogen:generateContent$/);
-    assert.match(calledModels[1], /gemini-2\.5-flash:generateContent$/);
+    assert.match(calledModels[0], /gemini-2\.5-flash:generateContent$/);
+    assert.match(calledModels[1], /gemini-2\.0-flash:generateContent$/);
     assert.equal(failoverRes.mode, 'genai');
     assert.equal(failoverRes.provider, 'gemini');
 
@@ -351,7 +361,7 @@ test('HTTP /api/health reports aiProvider and waqiEnabled without leaking secret
   });
 
   // /api/health with mocked keys must NEVER leak raw secrets
-  await withEnv({ GEMINI_API_KEY: 'super-secret-gemini-xyz', OPENAQ_API_KEY: 'super-secret-openaq-xyz', WAQI_API_TOKEN: 'super-secret-waqi-xyz', OPENAI_API_KEY: undefined, AI_PROVIDER: undefined }, async () => {
+  await withEnv({ GEMINI_API_KEY: 'super-secret-gemini-xyz', GEMINI_MODEL: undefined, OPENAQ_API_KEY: 'super-secret-openaq-xyz', WAQI_API_TOKEN: 'super-secret-waqi-xyz', OPENAI_API_KEY: undefined, AI_PROVIDER: undefined }, async () => {
     const res = await fetch(`${base}/api/health`);
     assert.equal(res.status, 200);
     const text = await res.text();
@@ -359,7 +369,7 @@ test('HTTP /api/health reports aiProvider and waqiEnabled without leaking secret
     assert.doesNotMatch(text, /super-secret-openaq-xyz/);
     assert.doesNotMatch(text, /super-secret-waqi-xyz/);
     const body = JSON.parse(text);
-    assert.deepEqual(body, { ok: true, aiEnabled: true, aiProvider: 'gemini', aiModel: 'gemini-4-hydrogen', openaqEnabled: true, waqiEnabled: true });
+    assert.deepEqual(body, { ok: true, aiEnabled: true, aiProvider: 'gemini', aiModel: 'gemini-2.5-flash', openaqEnabled: true, waqiEnabled: true });
   });
 
   // /api/stream rejects invalid coordinates with 400
